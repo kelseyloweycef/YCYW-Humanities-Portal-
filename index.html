@@ -42,91 +42,99 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        const StandardsView = ({ activeTab, subTab, isAdmin, userData }) => {
+        const StandardsView = ({ activeTab, subTab, isAdmin }) => {
             const [selectedDetail, setSelectedDetail] = useState(null);
-            const [message, setMessage] = useState('');
             
             const factions = [
-                { name: "Past and Present", icon: "fa-history", color: "text-amber-600", bg: "bg-amber-50" },
-                { name: "Our Evolving World", icon: "fa-earth-asia", color: "text-emerald-600", bg: "bg-emerald-50" },
-                { name: "Global Citizenship", icon: "fa-users-rays", color: "text-blue-600", bg: "bg-blue-50" },
-                { name: "Economics & Business", icon: "fa-chart-pie", color: "text-indigo-600", bg: "bg-indigo-50" }
+                { name: "Past and Present", icon: "fa-clock-rotate-left", topics: ["Silk Road", "Renaissance Art", "Local Heritage"] },
+                { name: "Our Evolving World", icon: "fa-earth-americas", topics: ["Tectonics", "Climate Change", "Urbanization"] },
+                { name: "Global Citizenship", icon: "fa-hand-holding-heart", topics: ["Human Rights", "UN Sustainable Goals", "Fair Trade"] },
+                { name: "Economics & Business", icon: "fa-chart-line", topics: ["Supply & Demand", "Entrepreneurship", "Global Trade"] }
             ];
 
-            const handleSendToAdmins = async () => {
-                if(!message) return;
-                await window.FB.addDoc(window.FB.collection(window.FB.db, "messages"), {
-                    from: userData.email,
-                    fromName: userData.name,
-                    content: message,
-                    subject: `${activeTab} - ${subTab}`,
-                    timestamp: window.FB.serverTimestamp(),
-                    readBy: []
-                });
-                alert("Message sent to all Curriculum Officers (Admins)!");
-                setMessage('');
-            };
-
-            const isSenior = ['igcse', 'ib', 'a-level', 'dse'].includes(activeTab);
+            const skills = ["Source Evaluation", "Data Interpretation", "Empathetic Reasoning"];
+            const commandTerms = ["Analyze", "Evaluate", "Explain", "Justify"];
 
             return (
                 <div className="space-y-10 animate-in pb-20">
-                    {/* Senior Section: Official Board & SOW */}
-                    {isSenior ? (
-                        <div className="space-y-8">
-                            <section className="bg-white p-10 rounded-[3rem] border-2 border-slate-100 shadow-sm">
-                                <h3 className="text-xs font-black text-indigo-500 uppercase tracking-widest mb-4 italic">Official Exam Board Curriculum</h3>
-                                <div className="p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-center">
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Click to access external specification links</p>
-                                </div>
-                            </section>
-                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Schemes of Work</h3>
-                                    <button className="bg-indigo-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase">Upload SOW</button>
-                                </div>
-                                <p className="text-xs text-slate-400 font-medium italic">Share your current schemes of work with the global network here.</p>
-                            </section>
-                        </div>
-                    ) : (
-                        /* Junior Section: Goals & Factions */
-                        <>
-                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
-                                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-6">End of Year Goals</h3>
-                                <ul className="space-y-3 text-sm font-semibold text-slate-700 list-disc pl-5">
-                                    <li>Analyze the intersection of local heritage and global historical shifts.</li>
-                                    <li>Develop spatial awareness through thematic mapping projects.</li>
-                                    <li>Demonstrate understanding of sustainable resource management.</li>
-                                </ul>
-                            </section>
+                    {/* 1. End of Year Goals */}
+                    <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                        <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-4">End of Year Goals</h3>
+                        <p className="text-xl font-bold text-slate-800 leading-relaxed">
+                            By the end of {subTab}, students will be able to synthesize complex humanities data to form independent, evidence-based conclusions regarding global interactions.
+                        </p>
+                    </section>
 
-                            <div className="space-y-6">
-                                {factions.map(f => (
-                                    <div key={f.name} className="bg-white p-10 rounded-[3rem] border border-slate-100 flex gap-8 items-center group transition-all">
-                                        <div className={`${f.bg} ${f.color} w-20 h-20 rounded-full flex items-center justify-center text-3xl shrink-0 shadow-inner transition-transform group-hover:scale-110`}>
-                                            <i className={`fa-solid ${f.icon}`}></i>
-                                        </div>
-                                        <div className="flex-1">
-                                            <h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5>
-                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-3">Curriculum Strand Standard</p>
-                                            <p className="text-sm text-slate-500 font-medium">Network alignment for {subTab} focus areas and thematic integration.</p>
-                                        </div>
-                                    </div>
+                    {/* 2. Key Skills & Command Terms */}
+                    <div className={`grid gap-6 ${activeTab === 'lower-secondary' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                        <div className="bg-indigo-50 p-8 rounded-[3rem] border border-indigo-100">
+                            <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-6 text-center">Key Skills</h4>
+                            <div className="flex flex-wrap gap-2 justify-center">
+                                {skills.map(s => (
+                                    <button key={s} onClick={() => setSelectedDetail({type: 'Skill', name: s})}
+                                        className="bg-white px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-tight text-slate-700 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                                        {s}
+                                    </button>
                                 ))}
                             </div>
-                        </>
-                    )}
+                        </div>
 
-                    {/* Global Ask a Question Box */}
-                    <section className="bg-indigo-900 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 text-7xl opacity-10"><i className="fa-solid fa-paper-plane"></i></div>
-                        <h4 className="text-xs font-black uppercase tracking-widest text-indigo-400 mb-4">Ask the Curriculum Officer</h4>
-                        <p className="text-sm text-indigo-100 mb-6 max-w-md">Your question will be sent to all system administrators. You will receive a notification when they reply.</p>
-                        <textarea value={message} onChange={e => setMessage(e.target.value)} 
-                            className="w-full bg-slate-800 p-6 rounded-2xl border-none text-sm text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-indigo-500 mb-4" 
-                            placeholder="Type your question or feedback here..." />
-                        <button onClick={handleSendToAdmins} className="px-10 py-4 bg-white text-indigo-900 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-indigo-50 transition-all">Send Message</button>
-                    </section>
+                        {activeTab === 'lower-secondary' && (
+                            <div className="bg-slate-900 p-8 rounded-[3rem] text-white">
+                                <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6 text-center">Command Terms</h4>
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                    {commandTerms.map(c => (
+                                        <button key={c} onClick={() => setSelectedDetail({type: 'Command Term', name: c})}
+                                            className="bg-slate-800 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-tight hover:bg-indigo-500 transition-all shadow-sm">
+                                            {c}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 3. The Four Factions (Stacked) */}
+                    <div className="space-y-6">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] text-center mb-8">Curriculum Strands</h4>
+                        {factions.map(f => (
+                            <div key={f.name} className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-8 items-start relative overflow-hidden group hover:border-indigo-200 transition-all">
+                                <div className="absolute -right-6 -bottom-6 text-8xl text-slate-50 group-hover:text-indigo-50/50 transition-colors"><i className={`fa-solid ${f.icon}`}></i></div>
+                                <div className="flex-1 relative z-10">
+                                    <h5 className="text-2xl font-black text-slate-800 mb-3">{f.name}</h5>
+                                    <p className="text-sm text-slate-500 leading-relaxed font-medium max-w-2xl">
+                                        Standard: Comprehensive exploration of {f.name} within the context of {subTab} Humanities frameworks, focusing on critical inquiry and connectivity.
+                                    </p>
+                                </div>
+                                <div className="w-full md:w-64 relative z-10">
+                                    <p className="text-[9px] font-black text-indigo-500 uppercase mb-3 tracking-widest">Example Topics</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {f.topics.map(t => <span key={t} className="px-3 py-1 bg-slate-50 text-slate-600 text-[10px] font-bold rounded-lg border">{t}</span>)}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Detail Modal */}
+                    {selectedDetail && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6" onClick={() => setSelectedDetail(null)}>
+                            <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl animate-in" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-2xl font-black text-slate-800 mb-2">{selectedDetail.name}</h3>
+                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-6">{selectedDetail.type} Descriptor</p>
+                                <div className="space-y-4">
+                                    <div className="p-6 bg-slate-50 rounded-2xl">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Description</p>
+                                        <p className="text-sm text-slate-600 leading-relaxed font-medium">Standardized YCYW expectation for {selectedDetail.name} mastery.</p>
+                                    </div>
+                                    <div className="p-6 bg-indigo-50 rounded-2xl border border-indigo-100">
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase mb-2 tracking-widest">Example</p>
+                                        <p className="text-sm italic text-indigo-900 font-medium">"In {subTab}, this looks like students being able to..."</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -136,9 +144,8 @@
             const [userData, setUserData] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [subTab, setSubTab] = useState(null);
+            const [expanded, setExpanded] = useState(null); 
             const [viewMode, setViewMode] = useState('standards');
-            const [unreadCount, setUnreadCount] = useState(0);
-            const [isSubscribed, setIsSubscribed] = useState(false);
 
             useEffect(() => {
                 const unsub = window.FB.onAuthStateChanged(window.FB.auth, async (u) => {
@@ -150,73 +157,78 @@
                 return () => unsub();
             }, []);
 
-            // Notification Listener logic
-            useEffect(() => {
-                if(userData) {
-                   // Mock unread count - in production this listens to the 'messages' collection
-                   setUnreadCount(2); 
-                }
-            }, [userData]);
+            const navConfig = [
+                { id: 'dashboard', label: 'Dashboard', icon: 'fa-gauge' },
+                { id: 'primary', label: 'Primary', icon: 'fa-child', subs: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6'] },
+                { id: 'lower-secondary', label: 'Lower Secondary', icon: 'fa-seedling', subs: ['Year 7', 'Year 8', 'Year 9'] },
+                { id: 'igcse', label: 'IGCSE', icon: 'fa-book-bookmark', subs: ['History', 'Geography', 'Psychology', 'Sociology', 'Economics', 'Business', 'Enterprise', 'Global Perspectives'] },
+                { id: 'ib', label: 'IB', icon: 'fa-graduation-cap', subs: ['History', 'Geography', 'Psychology', 'Economics', 'Business', 'Philosophy'] },
+                { id: 'a-level', label: 'A-Level', icon: 'fa-award', subs: ['History', 'Geography', 'Economics', 'Business'] },
+                { id: 'dse', label: 'DSE', icon: 'fa-pen-to-square', subs: ['Economics', 'Business'] },
+                { id: 'admin', label: 'Admin Hub', icon: 'fa-shield-halved', adminOnly: true }
+            ];
+
+            if (!user) return <div className="h-screen flex items-center justify-center bg-[#0f172a] text-white">Connecting...</div>;
 
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden">
-                    {/* Sidebar */}
                     <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl overflow-y-auto">
-                        <div className="p-8 font-black text-[11px] uppercase text-indigo-400 tracking-tighter">YCYW Humanities</div>
-                        {/* Navigation Items (Kept from previous) */}
+                        <div className="p-8 font-black text-sm uppercase text-indigo-400">YCYW Humanities</div>
                         <nav className="flex-1 px-4 space-y-1">
-                             <button onClick={() => {setActiveTab('dashboard'); setSubTab(null);}} className="w-full text-left p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-800">Dashboard</button>
-                             {/* Add other nav categories here as per previous logic */}
+                            {navConfig.map(item => {
+                                if (item.adminOnly && userData?.role !== 'ADMIN') return null;
+                                const isExpanded = expanded === item.id;
+                                return (
+                                    <div key={item.id}>
+                                        <button onClick={() => item.subs ? setExpanded(isExpanded ? null : item.id) : (setActiveTab(item.id), setSubTab(null))}
+                                            className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest ${activeTab === item.id && !subTab ? 'bg-indigo-600' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                            <div className="flex items-center gap-3"><i className={`fa-solid ${item.icon} w-4`}></i>{item.label}</div>
+                                            {item.subs && <i className={`fa-solid fa-chevron-down opacity-30 ${isExpanded ? 'rotate-180' : ''}`}></i>}
+                                        </button>
+                                        {item.subs && isExpanded && (
+                                            <div className="ml-6 space-y-1 mt-1 border-l border-slate-700/50">
+                                                {item.subs.map(sub => (
+                                                    <button key={sub} onClick={() => { setActiveTab(item.id); setSubTab(sub); setViewMode('standards'); }}
+                                                        className={`w-full text-left px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest ${subTab === sub ? 'text-indigo-400 bg-slate-800' : 'text-slate-500 hover:text-slate-300'}`}>
+                                                        {sub}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </nav>
                     </div>
 
                     <div className="flex-1 flex flex-col overflow-hidden">
-                        <header className="h-24 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm">
-                            <div className="flex items-center gap-4">
-                                <div>
-                                    <h2 className="font-black text-slate-800 uppercase text-lg leading-none">{subTab || activeTab}</h2>
-                                    {subTab && (
-                                        <button onClick={() => setIsSubscribed(!isSubscribed)} className={`mt-2 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest ${isSubscribed ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                            <i className={`fa-solid ${isSubscribed ? 'fa-bell' : 'fa-bell-slash'}`}></i>
-                                            {isSubscribed ? 'Notifications On' : 'Receive Notifications'}
-                                        </button>
-                                    )}
-                                </div>
+                        <header className="h-20 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm">
+                            <div className="flex items-center gap-2">
+                                <h2 className="font-black text-slate-800 uppercase tracking-tight text-lg">{activeTab.replace('-', ' ')}</h2>
+                                {subTab && <i className="fa-solid fa-chevron-right text-slate-300 text-[10px] mx-2"></i>}
+                                {subTab && <span className="text-indigo-600 font-black uppercase text-xs">{subTab}</span>}
                             </div>
-
-                            <div className="flex items-center gap-6">
-                                {/* GLOBAL INBOX */}
-                                <button className="relative p-3 bg-slate-100 rounded-2xl hover:bg-indigo-50 transition-all group">
-                                    <i className="fa-solid fa-inbox text-slate-500 group-hover:text-indigo-600"></i>
-                                    {unreadCount > 0 && (
-                                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[8px] font-black flex items-center justify-center rounded-full border-2 border-white">{unreadCount}</span>
-                                    )}
-                                </button>
-
-                                <div className="flex items-center gap-3 border-l pl-6">
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-black text-slate-800 uppercase leading-none">{userData?.name}</p>
-                                        <p className="text-[8px] font-bold text-indigo-500 uppercase mt-1">{userData?.role}</p>
-                                    </div>
-                                    <div className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center font-black text-xs uppercase shadow-lg shadow-indigo-200">{userData?.name?.[0]}</div>
+                            
+                            {subTab && (
+                                <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
+                                    <button onClick={() => setViewMode('standards')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${viewMode === 'standards' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Curriculum Standards</button>
+                                    <button onClick={() => setViewMode('library')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${viewMode === 'library' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Resource Library</button>
                                 </div>
-                            </div>
+                            )}
                         </header>
 
                         <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc]">
-                            {subTab ? (
-                                <div className="space-y-6 animate-in">
-                                    <div className="flex gap-2 mb-10">
-                                        <button onClick={() => setViewMode('standards')} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'standards' ? 'bg-indigo-600 text-white shadow-xl' : 'bg-white text-slate-400 border'}`}>Curriculum Standards</button>
-                                        <button onClick={() => setViewMode('library')} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'library' ? 'bg-indigo-600 text-white shadow-xl' : 'bg-white text-slate-400 border'}`}>Resource Library</button>
-                                    </div>
-                                    {viewMode === 'standards' ? <StandardsView activeTab={activeTab} subTab={subTab} isAdmin={userData?.role === 'ADMIN'} userData={userData} /> : <div>Library View...</div>}
-                                </div>
-                            ) : (
-                                <div className="mesh-bg rounded-[3rem] p-16 text-white shadow-2xl relative animate-in">
+                            {activeTab === 'dashboard' ? (
+                                <div className="mesh-bg rounded-[3rem] p-12 text-white shadow-2xl relative animate-in">
                                     <div className="mesh-circle"></div>
-                                    <h1 className="text-5xl font-black relative z-10 tracking-tighter">Welcome to the Network</h1>
-                                    <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-[0.4em]">Shared YCYW Humanities Excellence</p>
+                                    <h1 className="text-4xl font-black relative z-10 tracking-tight">Welcome back!</h1>
+                                    <p className="mt-2 text-indigo-100 relative z-10 font-bold uppercase text-[10px] tracking-[0.3em]">YCYW Humanities Network</p>
+                                </div>
+                            ) : subTab && viewMode === 'standards' && (activeTab === 'primary' || activeTab === 'lower-secondary') ? (
+                                <StandardsView activeTab={activeTab} subTab={subTab} isAdmin={userData?.role === 'ADMIN'} />
+                            ) : (
+                                <div className="text-center py-40 border-2 border-dashed border-slate-200 rounded-[4rem] text-slate-300 font-black uppercase text-[10px] tracking-[0.5em] animate-in">
+                                    {subTab ? `${viewMode.toUpperCase()} for ${subTab}` : "Select a Year Group"}
                                 </div>
                             )}
                         </main>
