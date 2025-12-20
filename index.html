@@ -4,14 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YCYW Humanities Portal</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f8fafc; 
+            color: #1e293b;
+        }
         .font-black { font-weight: 900; }
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background: rgba(248, 250, 252, 0.95);
+            backdrop-filter: blur(8px);
+            z-index: 50;
+        }
+        /* Custom scrollbar for a premium feel */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 
     <script type="importmap">
@@ -29,28 +46,29 @@
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        import React, { useState, useEffect } from "react";
+        import React, { useState, useEffect, useMemo } from "react";
         import { createRoot } from "react-dom";
         import { initializeApp } from "firebase/app";
-        import { getFirestore, collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
+        import { getFirestore, collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
-        // --- FIREBASE CONFIG ---
+        // --- FIREBASE CONFIGURATION ---
         const firebaseConfig = {
           apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
           authDomain: "ycyw-humanities-portal.firebaseapp.com",
           projectId: "ycyw-humanities-portal",
           storageBucket: "ycyw-humanities-portal.firebasestorage.app",
           messagingSenderId: "141054228326",
-          appId: "1:141054228326:web:13248804cf5e407a163aa7"
+          appId: "1:141054228326:web:13248804cf5e407a163aa7",
+          measurementId: "G-NJPT0NP98T"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // --- CONSTANTS ---
+        // --- CONSTANTS & TYPES ---
         const Subject = {
           HISTORY: 'History', GEOGRAPHY: 'Geography', PSYCHOLOGY: 'Psychology',
-          SOCIOLOGY: 'Sociology', ECONOMICS: 'Economics', BUSINESS: 'Business',
+          SOCIOLOGY: 'SOCIOLOGY', ECONOMICS: 'Economics', BUSINESS: 'Business',
           ENTERPRISE: 'Enterprise', PHILOSOPHY: 'Philosophy'
         };
 
@@ -67,173 +85,182 @@
           INTERNAL_ASSESSMENT: 'IA'
         };
 
-        const IGCSE_SUBJECTS = [Subject.HISTORY, Subject.GEOGRAPHY, Subject.PSYCHOLOGY, Subject.SOCIOLOGY, Subject.ECONOMICS, Subject.BUSINESS, Subject.ENTERPRISE];
+        const IGCSE_SUBJECTS = [Subject.HISTORY, Subject.GEOGRAPHY, Subject.PSYCHOLOGY, 'SOCIOLOGY', Subject.ECONOMICS, Subject.BUSINESS, Subject.ENTERPRISE];
         const IB_SUBJECTS = [Subject.HISTORY, Subject.GEOGRAPHY, Subject.PSYCHOLOGY, Subject.ECONOMICS, Subject.BUSINESS, Subject.PHILOSOPHY];
         const MODERATION_SUBJECTS = [Subject.HISTORY, Subject.GEOGRAPHY, Subject.ENTERPRISE];
         const SENIOR_CURRICULUM_SUBJECTS = [Subject.HISTORY, Subject.ECONOMICS, Subject.BUSINESS, Subject.GEOGRAPHY, Subject.PSYCHOLOGY];
         const DSE_ELIGIBLE_SUBJECTS = [Subject.ECONOMICS, Subject.BUSINESS];
 
-        // --- MISSING UI COMPONENTS (RESOURCE GRID & FORUM) ---
+        // --- UI COMPONENTS ---
 
-        const ResourceGrid = ({ resources, onResourceClick }) => (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {resources.map(res => (
-              <div key={res.id} onClick={() => onResourceClick(res)} className="group bg-white p-6 rounded-[2rem] border border-slate-200 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-50 transition-all cursor-pointer">
+        const ResourceCard = ({ resource, onClick }) => (
+            <div onClick={() => onClick(resource)} className="group bg-white p-5 rounded-[2rem] border border-slate-200 hover:border-indigo-400 hover:shadow-2xl hover:shadow-indigo-100 transition-all cursor-pointer animate-in">
                 <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                    <i className="fa-solid fa-file-lines"></i>
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-tighter bg-slate-100 px-2 py-1 rounded-lg">{res.type}</span>
+                    <div className="w-12 h-12 bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white rounded-2xl flex items-center justify-center transition-all duration-300">
+                        <i className="fa-solid fa-file-pdf text-xl"></i>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
+                        {resource.type}
+                    </span>
                 </div>
-                <h4 className="font-black text-slate-800 leading-tight mb-2">{res.title}</h4>
-                <div className="flex items-center gap-2 mt-4 text-[10px] font-bold text-slate-400">
-                   <i className="fa-solid fa-user"></i> <span>{res.author || 'Staff'}</span>
+                <h4 className="text-slate-800 font-black leading-tight group-hover:text-indigo-600 transition-colors">{resource.title}</h4>
+                <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <i className="fa-solid fa-user-circle mr-1"></i> {resource.author || 'Department'}
+                    </span>
+                    <i className="fa-solid fa-arrow-right text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all"></i>
                 </div>
-              </div>
-            ))}
-          </div>
+            </div>
         );
 
-        const Forum = ({ posts, setPosts, currentUser, contextSubject }) => {
-            const [newPost, setNewPost] = useState('');
-            const handleAddPost = async () => {
-                if(!newPost) return;
-                await addDoc(collection(db, "forum"), {
-                    title: "Discussion",
-                    content: newPost,
-                    author: currentUser.name,
-                    subject: contextSubject || 'General',
-                    createdAt: serverTimestamp(),
-                    replies: []
+        const YearGroupView = ({ resources, mode, currentUser }) => {
+            const [selectedSubTab, setSelectedSubTab] = useState('');
+            const [selectedCurriculum, setSelectedCurriculum] = useState('IB');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [view, setView] = useState('resources');
+
+            useEffect(() => {
+                if (mode === 'years') setSelectedSubTab(YearGroup.YEAR_7);
+                else if (mode === 'igcse') setSelectedSubTab(Subject.HISTORY);
+                else if (mode === 'ib') { setSelectedSubTab(Subject.HISTORY); setSelectedCurriculum('IB'); }
+                setView('resources');
+            }, [mode]);
+
+            const showIATab = mode === 'ib' && selectedCurriculum === 'IB';
+            const showModerationTab = mode === 'igcse' && MODERATION_SUBJECTS.includes(selectedSubTab);
+            const showCurriculumSwitcher = mode === 'ib' && SENIOR_CURRICULUM_SUBJECTS.includes(selectedSubTab);
+
+            const filteredResources = useMemo(() => {
+                return resources.filter(res => {
+                    const matchesSearch = res.title.toLowerCase().includes(searchTerm.toLowerCase());
+                    if (!matchesSearch) return false;
+
+                    if (mode === 'years') return res.yearGroup === selectedSubTab;
+                    if (mode === 'igcse') return res.subject === selectedSubTab;
+                    if (mode === 'ib') {
+                        const isSubject = res.subject === selectedSubTab;
+                        const isCurriculum = SENIOR_CURRICULUM_SUBJECTS.includes(selectedSubTab) ? (res.curriculum === selectedCurriculum || !res.curriculum) : true;
+                        return isSubject && isCurriculum;
+                    }
+                    return false;
                 });
-                setNewPost('');
+            }, [resources, mode, selectedSubTab, selectedCurriculum, searchTerm]);
+
+            const getSubTabOptions = () => {
+                if (mode === 'years') return [YearGroup.YEAR_7, YearGroup.YEAR_8, YearGroup.YEAR_9];
+                if (mode === 'igcse') return IGCSE_SUBJECTS;
+                if (mode === 'ib') return IB_SUBJECTS;
+                return [];
             };
-            return (
-                <div className="bg-white rounded-[3rem] p-8 border border-slate-200 shadow-sm">
-                    <h2 className="text-2xl font-black mb-6">Discussion Board</h2>
-                    <div className="flex gap-4 mb-8">
-                        <input value={newPost} onChange={e => setNewPost(e.target.value)} placeholder="Ask a question..." className="flex-1 px-6 py-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500" />
-                        <button onClick={handleAddPost} className="bg-indigo-600 text-white px-8 rounded-2xl font-black">Post</button>
-                    </div>
-                    <div className="space-y-4">
-                        {posts.map(post => (
-                            <div key={post.id} className="p-6 bg-slate-50 rounded-2xl">
-                                <p className="font-bold text-slate-800">{post.content}</p>
-                                <p className="text-[10px] text-slate-400 mt-2">By {post.author} in {post.subject}</p>
+
+            const renderSection = (title, icon, typeList) => {
+                const sectionData = filteredResources.filter(r => typeList.includes(r.type));
+                if (sectionData.length === 0) return null;
+                return (
+                    <section className="mb-12">
+                        <div className="flex items-center gap-3 mb-6 border-b border-slate-200 pb-4">
+                            <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><i className={`fa-solid ${icon}`}></i></div>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800">{title}</h3>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{sectionData.length} Items</p>
                             </div>
-                        ))}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {sectionData.map(res => <ResourceCard key={res.id} resource={res} onClick={(r) => window.open(r.link)} />)}
+                        </div>
+                    </section>
+                );
+            };
+
+            return (
+                <div className="space-y-8 animate-in">
+                    <div className="sticky-header py-4 border-b border-slate-200">
+                        <div className="flex flex-col space-y-4">
+                            <div className="flex flex-col lg:flex-row gap-4 items-center">
+                                <div className="flex flex-wrap gap-1 p-1 bg-slate-200/50 rounded-[1.8rem] w-full lg:w-auto">
+                                    {getSubTabOptions().map(opt => (
+                                        <button key={opt} onClick={() => setSelectedSubTab(opt)} className={`px-5 py-2 rounded-[1.4rem] text-[11px] font-black transition-all whitespace-nowrap ${selectedSubTab === opt ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/40'}`}>{opt}</button>
+                                    ))}
+                                </div>
+                                <div className="relative flex-1 w-full">
+                                    <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                    <input type="text" placeholder={`Search in ${selectedSubTab}...`} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm" onChange={(e) => setSearchTerm(e.target.value)} />
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex gap-2">
+                                    <button onClick={() => setView('resources')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'resources' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-100 text-slate-500'}`}>Resources</button>
+                                    {showIATab && <button onClick={() => setView('ia')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'ia' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>Internal Assessments</button>}
+                                </div>
+                                
+                                {showCurriculumSwitcher && (
+                                    <div className="flex items-center gap-1.5 p-1 bg-slate-200/50 rounded-2xl border border-slate-200">
+                                        {['IB', 'A-Level'].map(curr => (
+                                            <button key={curr} onClick={() => setSelectedCurriculum(curr)} className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedCurriculum === curr ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>{curr}</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pb-20">
+                        {renderSection("Schemes of Work", "fa-sitemap", [ResourceType.SCHEME_OF_WORK])}
+                        {renderSection("Assessments & Marking", "fa-vial-circle-check", [ResourceType.ASSESSMENT, ResourceType.MARK_SCHEME])}
+                        {renderSection("Lesson Resources", "fa-book-open", [ResourceType.LESSON_PLAN, ResourceType.PRESENTATION, ResourceType.WORKSHEET, ResourceType.EXAMPLE_WORK])}
+                        
+                        {filteredResources.length === 0 && (
+                            <div className="text-center py-32 bg-white/50 border-2 border-dashed border-slate-200 rounded-[3rem]">
+                                <i className="fa-solid fa-folder-open text-4xl text-slate-200 mb-4 block"></i>
+                                <p className="text-slate-400 font-black uppercase text-xs tracking-widest">No resources found for {selectedSubTab}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             );
         };
 
-        // --- YOUR EXACT YearGroupView COMPONENT ---
-
-        const YearGroupView = ({ 
-          resources, onResourceClick, mode, forumPosts, setForumPosts, currentUser 
-        }) => {
-          const [selectedSubTab, setSelectedSubTab] = useState('');
-          const [selectedCurriculum, setSelectedCurriculum] = useState('IB');
-          const [searchTerm, setSearchTerm] = useState('');
-          const [view, setView] = useState('resources');
-
-          useEffect(() => {
-            if (mode === 'years') setSelectedSubTab(YearGroup.YEAR_7);
-            else if (mode === 'igcse') setSelectedSubTab(Subject.HISTORY);
-            else if (mode === 'ib') { setSelectedSubTab(Subject.HISTORY); setSelectedCurriculum('IB'); }
-            setView('resources');
-          }, [mode]);
-
-          const showModerationTab = mode === 'igcse' && MODERATION_SUBJECTS.includes(selectedSubTab);
-          const showIATab = mode === 'ib' && selectedCurriculum === 'IB';
-          const showCurriculumSwitcher = mode === 'ib' && SENIOR_CURRICULUM_SUBJECTS.includes(selectedSubTab);
-
-          const filtered = resources.filter(res => {
-              const matchesSearch = res.title.toLowerCase().includes(searchTerm.toLowerCase());
-              if (!matchesSearch) return false;
-              if (mode === 'years') return res.yearGroup === selectedSubTab;
-              if (mode === 'igcse') return res.subject === selectedSubTab;
-              if (mode === 'ib') return res.subject === selectedSubTab && (res.curriculum === selectedCurriculum || !res.curriculum);
-              return false;
-          });
-
-          const schemesOfWork = filtered.filter(r => r.type === ResourceType.SCHEME_OF_WORK);
-          const generalResources = filtered.filter(r => r.type !== ResourceType.SCHEME_OF_WORK);
-
-          const renderSectionHeader = (title, icon, count) => (
-            <div className="flex items-center gap-3 mb-6 mt-10 border-b border-slate-200 pb-4 first:mt-0">
-              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-                <i className={`fa-solid ${icon}`}></i>
-              </div>
-              <div><h3 className="text-xl font-black text-slate-800">{title}</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{count} Items</p></div>
-            </div>
-          );
-
-          return (
-            <div className="space-y-8 animate-in pb-20 px-4">
-              <div className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-30 py-4 border-b border-slate-200">
-                <div className="flex flex-col space-y-4">
-                  <div className="flex flex-col lg:flex-row gap-4 items-center">
-                    <div className="flex flex-wrap gap-1.5 p-1 bg-slate-200/50 rounded-[1.8rem]">
-                      {(mode === 'years' ? [YearGroup.YEAR_7, YearGroup.YEAR_8, YearGroup.YEAR_9] : (mode === 'igcse' ? IGCSE_SUBJECTS : IB_SUBJECTS)).map(opt => (
-                        <button key={opt} onClick={() => setSelectedSubTab(opt)} className={`px-4 py-2 rounded-[1.4rem] text-[11px] font-black transition-all ${selectedSubTab === opt ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/40'}`}>{opt}</button>
-                      ))}
-                    </div>
-                    <input type="text" placeholder={`Search in ${selectedSubTab}...`} className="flex-1 pl-6 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm" onChange={(e) => setSearchTerm(e.target.value)} />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setView('resources')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase ${view === 'resources' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Resources</button>
-                    <button onClick={() => setView('discussion')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase ${view === 'discussion' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Forum</button>
-                    {showCurriculumSwitcher && (
-                        <div className="ml-auto flex bg-slate-200/50 p-1 rounded-xl">
-                            {['IB', 'A-Level'].map(c => (
-                                <button key={c} onClick={() => setSelectedCurriculum(c)} className={`px-3 py-1 rounded-lg text-[10px] font-black ${selectedCurriculum === c ? 'bg-white text-indigo-600' : 'text-slate-500'}`}>{c}</button>
-                            ))}
-                        </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {view === 'resources' ? (
-                <div className="space-y-12">
-                  <section>{renderSectionHeader("Schemes of Work", "fa-sitemap", schemesOfWork.length)}<ResourceGrid resources={schemesOfWork} onResourceClick={onResourceClick} /></section>
-                  <section>{renderSectionHeader("General Resources", "fa-book-open", generalResources.length)}<ResourceGrid resources={generalResources} onResourceClick={onResourceClick} /></section>
-                </div>
-              ) : (
-                <Forum posts={forumPosts} currentUser={currentUser} contextSubject={selectedSubTab} />
-              )}
-            </div>
-          );
-        };
-
-        // --- MAIN APPLICATION ENTRY ---
+        // --- MAIN APPLICATION ---
 
         const App = () => {
-          const [resources, setResources] = useState([]);
-          const [forumPosts, setForumPosts] = useState([]);
-          const [mode, setMode] = useState('years');
-          const currentUser = { name: "Kelsey Lowe", subscriptions: [] };
+            const [resources, setResources] = useState([]);
+            const [mode, setMode] = useState('years');
+            const currentUser = { name: "Kelsey Lowe", subscriptions: [] };
 
-          useEffect(() => {
-            const unsubRes = onSnapshot(collection(db, "resources"), (s) => setResources(s.docs.map(d => ({id: d.id, ...d.data()}))));
-            const unsubForum = onSnapshot(collection(db, "forum"), (s) => setForumPosts(s.docs.map(d => ({id: d.id, ...d.data()}))));
-            return () => { unsubRes(); unsubForum(); };
-          }, []);
+            useEffect(() => {
+                const q = query(collection(db, "resources"));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setResources(docs);
+                });
+                return () => unsubscribe();
+            }, []);
 
-          return (
-            <div className="max-w-7xl mx-auto">
-               <nav className="p-8 flex items-center justify-between">
-                  <h1 className="text-3xl font-black text-indigo-600 tracking-tighter italic">HUMANITIES.HUB</h1>
-                  <div className="flex gap-4">
-                      {['years', 'igcse', 'ib'].map(m => (
-                          <button key={m} onClick={() => setMode(m)} className={`px-6 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${mode === m ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400'}`}>{m}</button>
-                      ))}
-                  </div>
-               </nav>
-               <YearGroupView mode={mode} resources={resources} forumPosts={forumPosts} setForumPosts={setForumPosts} currentUser={currentUser} onResourceClick={(res) => window.open(res.link)} />
-            </div>
-          );
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                    <header className="py-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center text-white text-2xl shadow-xl shadow-indigo-200">
+                                <i className="fa-solid fa-landmark"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-3xl font-black text-slate-800 tracking-tighter">YCYW HUMANITIES PORTAL</h1>
+                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em]">Shared Resource Network</p>
+                            </div>
+                        </div>
+                        <nav className="flex gap-2 p-1.5 bg-white border border-slate-200 rounded-[2rem] shadow-sm">
+                            {['years', 'igcse', 'ib'].map(m => (
+                                <button key={m} onClick={() => setMode(m)} className={`px-8 py-3 rounded-[1.6rem] text-[11px] font-black uppercase tracking-widest transition-all ${mode === m ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-500'}`}>
+                                    {m === 'years' ? 'Years 7-9' : m}
+                                </button>
+                            ))}
+                        </nav>
+                    </header>
+
+                    <YearGroupView resources={resources} mode={mode} currentUser={currentUser} />
+                </div>
+            );
         };
 
         const root = createRoot(document.getElementById('root'));
