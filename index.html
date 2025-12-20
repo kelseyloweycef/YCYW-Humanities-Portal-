@@ -8,6 +8,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .font-black { font-weight: 900; }
+    </style>
+
     <script type="importmap">
     {
       "imports": {
@@ -26,9 +32,9 @@
         import React, { useState, useEffect } from "react";
         import { createRoot } from "react-dom";
         import { initializeApp } from "firebase/app";
-        import { getFirestore, collection, onSnapshot, query, orderBy } from "firebase/firestore";
+        import { getFirestore, collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
 
-        // Your Firebase Configuration
+        // --- FIREBASE CONFIG ---
         const firebaseConfig = {
           apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
           authDomain: "ycyw-humanities-portal.firebaseapp.com",
@@ -41,92 +47,193 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // --- CONSTANTS (Browser version of your Types) ---
-        const UserRole = { ADMIN: 'ADMIN', STAFF: 'STAFF' };
-        const ResourceStatus = { APPROVED: 'APPROVED', PENDING: 'PENDING' };
+        // --- CONSTANTS ---
+        const Subject = {
+          HISTORY: 'History', GEOGRAPHY: 'Geography', PSYCHOLOGY: 'Psychology',
+          SOCIOLOGY: 'Sociology', ECONOMICS: 'Economics', BUSINESS: 'Business',
+          ENTERPRISE: 'Enterprise', PHILOSOPHY: 'Philosophy'
+        };
 
-        // --- SUB-COMPONENTS (Simplified for the single-file demo) ---
-        const Sidebar = ({ activeTab, setActiveTab, isAdmin }) => (
-            <div className="w-64 bg-slate-900 text-white p-6 hidden md:block">
-                <h1 className="text-xl font-black mb-10 text-indigo-400">HUB.SHARE</h1>
-                <nav className="space-y-4">
-                    {['dashboard', 'years-7-9', 'igcse', 'ib', 'pd'].map(tab => (
-                        <button key={tab} onClick={() => setActiveTab(tab)} 
-                            className={`block w-full text-left p-2 rounded ${activeTab === tab ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}>
-                            {tab.toUpperCase()}
-                        </button>
-                    ))}
-                    {isAdmin && <button onClick={() => setActiveTab('admin')} className="block w-full text-left p-2 text-amber-400">ADMIN PANEL</button>}
-                </nav>
-            </div>
+        const YearGroup = {
+          YEAR_7: 'Year 7', YEAR_8: 'Year 8', YEAR_9: 'Year 9',
+          YEAR_10: 'Year 10', YEAR_11: 'Year 11', YEAR_12: 'Year 12', YEAR_13: 'Year 13'
+        };
+
+        const ResourceType = {
+          SCHEME_OF_WORK: 'Scheme of Work', ASSESSMENT: 'Assessment',
+          MARK_SCHEME: 'Mark Scheme', LESSON_PLAN: 'Lesson Plan',
+          PRESENTATION: 'Presentation', WORKSHEET: 'Worksheet',
+          EXAMPLE_WORK: 'Example Work', COURSEWORK: 'Coursework',
+          INTERNAL_ASSESSMENT: 'IA'
+        };
+
+        const IGCSE_SUBJECTS = [Subject.HISTORY, Subject.GEOGRAPHY, Subject.PSYCHOLOGY, Subject.SOCIOLOGY, Subject.ECONOMICS, Subject.BUSINESS, Subject.ENTERPRISE];
+        const IB_SUBJECTS = [Subject.HISTORY, Subject.GEOGRAPHY, Subject.PSYCHOLOGY, Subject.ECONOMICS, Subject.BUSINESS, Subject.PHILOSOPHY];
+        const MODERATION_SUBJECTS = [Subject.HISTORY, Subject.GEOGRAPHY, Subject.ENTERPRISE];
+        const SENIOR_CURRICULUM_SUBJECTS = [Subject.HISTORY, Subject.ECONOMICS, Subject.BUSINESS, Subject.GEOGRAPHY, Subject.PSYCHOLOGY];
+        const DSE_ELIGIBLE_SUBJECTS = [Subject.ECONOMICS, Subject.BUSINESS];
+
+        // --- MISSING UI COMPONENTS (RESOURCE GRID & FORUM) ---
+
+        const ResourceGrid = ({ resources, onResourceClick }) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {resources.map(res => (
+              <div key={res.id} onClick={() => onResourceClick(res)} className="group bg-white p-6 rounded-[2rem] border border-slate-200 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-50 transition-all cursor-pointer">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <i className="fa-solid fa-file-lines"></i>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-tighter bg-slate-100 px-2 py-1 rounded-lg">{res.type}</span>
+                </div>
+                <h4 className="font-black text-slate-800 leading-tight mb-2">{res.title}</h4>
+                <div className="flex items-center gap-2 mt-4 text-[10px] font-bold text-slate-400">
+                   <i className="fa-solid fa-user"></i> <span>{res.author || 'Staff'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         );
 
-        const Header = ({ currentUser, onUploadClick }) => (
-            <header className="bg-white border-b p-4 flex justify-between items-center px-8">
-                <div className="text-sm font-bold text-slate-500">Welcome back, {currentUser.name}</div>
-                <button onClick={onUploadClick} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold">
-                    + Upload Resource
-                </button>
-            </header>
-        );
-
-        // --- MAIN APP ---
-        const App = () => {
-            const [currentUser, setCurrentUser] = useState({ id: 'u1', name: 'Kelsey Lowe', role: UserRole.ADMIN, subscriptions: [], notifications: [] });
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [resources, setResources] = useState([]);
-            const [isUploadOpen, setIsUploadOpen] = useState(false);
-
-            const isAdmin = currentUser?.role === UserRole.ADMIN;
-
-            // LIVE FIREBASE SYNC
-            useEffect(() => {
-                const q = query(collection(db, "resources"));
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setResources(data);
+        const Forum = ({ posts, setPosts, currentUser, contextSubject }) => {
+            const [newPost, setNewPost] = useState('');
+            const handleAddPost = async () => {
+                if(!newPost) return;
+                await addDoc(collection(db, "forum"), {
+                    title: "Discussion",
+                    content: newPost,
+                    author: currentUser.name,
+                    subject: contextSubject || 'General',
+                    createdAt: serverTimestamp(),
+                    replies: []
                 });
-                return () => unsubscribe();
-            }, []);
-
-            const renderContent = () => {
-                const approvedResources = resources.filter(r => r.status === ResourceStatus.APPROVED || !r.status);
-                
-                return (
-                    <div className="animate-in p-6">
-                        <h2 className="text-3xl font-black text-slate-800 mb-6 capitalize">{activeTab.replace('-', ' ')}</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {approvedResources.length > 0 ? approvedResources.map(res => (
-                                <div key={res.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                                    <div className="text-xs font-black text-indigo-600 mb-2">{res.type}</div>
-                                    <h4 className="font-bold text-lg">{res.title}</h4>
-                                    <p className="text-sm text-slate-500 mt-2">{res.description}</p>
-                                    <div className="mt-4 flex justify-between items-center text-xs font-bold text-slate-400">
-                                        <span>{res.author}</span>
-                                        <button className="text-indigo-600">Download</button>
-                                    </div>
-                                </div>
-                            )) : (
-                                <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-3xl">
-                                    <p className="text-slate-400 font-bold uppercase">No resources found in {activeTab}.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
+                setNewPost('');
             };
-
             return (
-                <div className="flex h-screen bg-slate-50">
-                    <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin} />
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <Header currentUser={currentUser} onUploadClick={() => alert('Upload Modal would open here!')} />
-                        <main className="flex-1 overflow-y-auto">
-                            {renderContent()}
-                        </main>
+                <div className="bg-white rounded-[3rem] p-8 border border-slate-200 shadow-sm">
+                    <h2 className="text-2xl font-black mb-6">Discussion Board</h2>
+                    <div className="flex gap-4 mb-8">
+                        <input value={newPost} onChange={e => setNewPost(e.target.value)} placeholder="Ask a question..." className="flex-1 px-6 py-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <button onClick={handleAddPost} className="bg-indigo-600 text-white px-8 rounded-2xl font-black">Post</button>
+                    </div>
+                    <div className="space-y-4">
+                        {posts.map(post => (
+                            <div key={post.id} className="p-6 bg-slate-50 rounded-2xl">
+                                <p className="font-bold text-slate-800">{post.content}</p>
+                                <p className="text-[10px] text-slate-400 mt-2">By {post.author} in {post.subject}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
             );
+        };
+
+        // --- YOUR EXACT YearGroupView COMPONENT ---
+
+        const YearGroupView = ({ 
+          resources, onResourceClick, mode, forumPosts, setForumPosts, currentUser 
+        }) => {
+          const [selectedSubTab, setSelectedSubTab] = useState('');
+          const [selectedCurriculum, setSelectedCurriculum] = useState('IB');
+          const [searchTerm, setSearchTerm] = useState('');
+          const [view, setView] = useState('resources');
+
+          useEffect(() => {
+            if (mode === 'years') setSelectedSubTab(YearGroup.YEAR_7);
+            else if (mode === 'igcse') setSelectedSubTab(Subject.HISTORY);
+            else if (mode === 'ib') { setSelectedSubTab(Subject.HISTORY); setSelectedCurriculum('IB'); }
+            setView('resources');
+          }, [mode]);
+
+          const showModerationTab = mode === 'igcse' && MODERATION_SUBJECTS.includes(selectedSubTab);
+          const showIATab = mode === 'ib' && selectedCurriculum === 'IB';
+          const showCurriculumSwitcher = mode === 'ib' && SENIOR_CURRICULUM_SUBJECTS.includes(selectedSubTab);
+
+          const filtered = resources.filter(res => {
+              const matchesSearch = res.title.toLowerCase().includes(searchTerm.toLowerCase());
+              if (!matchesSearch) return false;
+              if (mode === 'years') return res.yearGroup === selectedSubTab;
+              if (mode === 'igcse') return res.subject === selectedSubTab;
+              if (mode === 'ib') return res.subject === selectedSubTab && (res.curriculum === selectedCurriculum || !res.curriculum);
+              return false;
+          });
+
+          const schemesOfWork = filtered.filter(r => r.type === ResourceType.SCHEME_OF_WORK);
+          const generalResources = filtered.filter(r => r.type !== ResourceType.SCHEME_OF_WORK);
+
+          const renderSectionHeader = (title, icon, count) => (
+            <div className="flex items-center gap-3 mb-6 mt-10 border-b border-slate-200 pb-4 first:mt-0">
+              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                <i className={`fa-solid ${icon}`}></i>
+              </div>
+              <div><h3 className="text-xl font-black text-slate-800">{title}</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{count} Items</p></div>
+            </div>
+          );
+
+          return (
+            <div className="space-y-8 animate-in pb-20 px-4">
+              <div className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-30 py-4 border-b border-slate-200">
+                <div className="flex flex-col space-y-4">
+                  <div className="flex flex-col lg:flex-row gap-4 items-center">
+                    <div className="flex flex-wrap gap-1.5 p-1 bg-slate-200/50 rounded-[1.8rem]">
+                      {(mode === 'years' ? [YearGroup.YEAR_7, YearGroup.YEAR_8, YearGroup.YEAR_9] : (mode === 'igcse' ? IGCSE_SUBJECTS : IB_SUBJECTS)).map(opt => (
+                        <button key={opt} onClick={() => setSelectedSubTab(opt)} className={`px-4 py-2 rounded-[1.4rem] text-[11px] font-black transition-all ${selectedSubTab === opt ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/40'}`}>{opt}</button>
+                      ))}
+                    </div>
+                    <input type="text" placeholder={`Search in ${selectedSubTab}...`} className="flex-1 pl-6 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm" onChange={(e) => setSearchTerm(e.target.value)} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setView('resources')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase ${view === 'resources' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Resources</button>
+                    <button onClick={() => setView('discussion')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase ${view === 'discussion' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Forum</button>
+                    {showCurriculumSwitcher && (
+                        <div className="ml-auto flex bg-slate-200/50 p-1 rounded-xl">
+                            {['IB', 'A-Level'].map(c => (
+                                <button key={c} onClick={() => setSelectedCurriculum(c)} className={`px-3 py-1 rounded-lg text-[10px] font-black ${selectedCurriculum === c ? 'bg-white text-indigo-600' : 'text-slate-500'}`}>{c}</button>
+                            ))}
+                        </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {view === 'resources' ? (
+                <div className="space-y-12">
+                  <section>{renderSectionHeader("Schemes of Work", "fa-sitemap", schemesOfWork.length)}<ResourceGrid resources={schemesOfWork} onResourceClick={onResourceClick} /></section>
+                  <section>{renderSectionHeader("General Resources", "fa-book-open", generalResources.length)}<ResourceGrid resources={generalResources} onResourceClick={onResourceClick} /></section>
+                </div>
+              ) : (
+                <Forum posts={forumPosts} currentUser={currentUser} contextSubject={selectedSubTab} />
+              )}
+            </div>
+          );
+        };
+
+        // --- MAIN APPLICATION ENTRY ---
+
+        const App = () => {
+          const [resources, setResources] = useState([]);
+          const [forumPosts, setForumPosts] = useState([]);
+          const [mode, setMode] = useState('years');
+          const currentUser = { name: "Kelsey Lowe", subscriptions: [] };
+
+          useEffect(() => {
+            const unsubRes = onSnapshot(collection(db, "resources"), (s) => setResources(s.docs.map(d => ({id: d.id, ...d.data()}))));
+            const unsubForum = onSnapshot(collection(db, "forum"), (s) => setForumPosts(s.docs.map(d => ({id: d.id, ...d.data()}))));
+            return () => { unsubRes(); unsubForum(); };
+          }, []);
+
+          return (
+            <div className="max-w-7xl mx-auto">
+               <nav className="p-8 flex items-center justify-between">
+                  <h1 className="text-3xl font-black text-indigo-600 tracking-tighter italic">HUMANITIES.HUB</h1>
+                  <div className="flex gap-4">
+                      {['years', 'igcse', 'ib'].map(m => (
+                          <button key={m} onClick={() => setMode(m)} className={`px-6 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${mode === m ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400'}`}>{m}</button>
+                      ))}
+                  </div>
+               </nav>
+               <YearGroupView mode={mode} resources={resources} forumPosts={forumPosts} setForumPosts={setForumPosts} currentUser={currentUser} onResourceClick={(res) => window.open(res.link)} />
+            </div>
+          );
         };
 
         const root = createRoot(document.getElementById('root'));
