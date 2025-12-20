@@ -1,106 +1,331 @@
-<script type="text/babel" data-type="module">
-    // ... (Keep previous Firebase and AI imports)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YCYW Humanities Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; overflow: hidden; }
+        .font-black { font-weight: 900; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .mesh-bg { background: linear-gradient(135deg, #4f46e5 0%, #1e293b 100%); position: relative; overflow: hidden; }
+        .mesh-circle { position: absolute; top: -20%; right: -10%; width: 300px; height: 300px; background: #6366f1; border-radius: 50%; blur: 100px; opacity: 0.4; filter: blur(80px); }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom": "https://esm.sh/react-dom@18.2.0/client",
+        "@google/genai": "https://esm.sh/@google/genai@1.34.0",
+        "firebase/app": "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
 
-    const Dashboard = ({ userData, resources }) => {
-        const [followedSubjects, setFollowedSubjects] = useState(userData.followedSubjects || userData.subjects);
-        
-        // Dynamic Greeting
-        const hour = new Date().getHours();
-        const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect } from "react";
+        import { createRoot } from "react-dom";
+        import { initializeApp } from "firebase/app";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, updateDoc, query, where, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
+        import { GoogleGenerativeAI } from "@google/genai";
 
-        // Filtering Updates based on followed subjects
-        const recentUpdates = resources
-            .filter(r => followedSubjects.includes(r.subject))
-            .slice(0, 5);
+        // --- CONFIG ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
+          authDomain: "ycyw-humanities-portal.firebaseapp.com",
+          projectId: "ycyw-humanities-portal",
+          storageBucket: "ycyw-humanities-portal.firebasestorage.app",
+          messagingSenderId: "141054228326",
+          appId: "1:141054228326:web:13248804cf5e407a163aa7"
+        };
 
-        return (
-            <div className="space-y-8 animate-in">
-                {/* Hero Welcome */}
-                <div className="relative overflow-hidden rounded-[3rem] p-10 text-white shadow-2xl bg-gradient-to-br from-indigo-600 via-slate-800 to-slate-900">
-                    <div className="relative z-10">
-                        <h1 className="text-4xl font-black tracking-tight mb-2">{greeting}, {userData.name.split(' ')[0]}!</h1>
-                        <p className="text-indigo-200 font-medium max-w-md">Welcome back to the YCYW Humanities hub. Here is what is happening in your departments today.</p>
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const genAI = new GoogleGenerativeAI("YOUR_GEMINI_API_KEY_HERE");
+
+        const SUBJECTS = ["History", "Geography", "Business", "Economics", "Psychology", "Sociology", "Enterprise", "Philosophy", "General Humanities"];
+        const MASTER_EMAIL = "kelsey.lowe@hk.ycef.com";
+
+        // --- COMPONENTS ---
+
+        const DashboardView = ({ userData }) => {
+            const hour = new Date().getHours();
+            const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+            
+            return (
+                <div className="space-y-8 animate-in pb-10">
+                    {/* Hero Welcome */}
+                    <div className="mesh-bg rounded-[3rem] p-12 text-white shadow-2xl relative">
+                        <div className="mesh-circle"></div>
+                        <div className="relative z-10">
+                            <h1 className="text-4xl font-black tracking-tight mb-2">{greeting}, {userData.name.split(' ')[0]}!</h1>
+                            <p className="text-indigo-100 font-medium max-w-lg opacity-90">Welcome to the YCYW Humanities Portal. Explore resources, collaborate in discussions, and access AI-driven curriculum support.</p>
+                        </div>
                     </div>
-                    {/* Decorative Mesh Circle */}
-                    <div className="absolute top-[-20%] right-[-10%] w-80 h-80 bg-indigo-500 rounded-full blur-[100px] opacity-50"></div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Feed Column */}
+                        <div className="lg:col-span-2 space-y-8">
+                            <section className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Humanities Foundation Feed</h3>
+                                    <i className="fa-solid fa-bullhorn text-indigo-500"></i>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="p-5 bg-indigo-50/50 rounded-2xl border-l-4 border-indigo-600">
+                                        <p className="text-sm font-bold text-slate-800">New Global Celebration</p>
+                                        <p className="text-xs text-slate-500 mt-1">Celebrating our Sociology team's recent collaboration on the 'Human Rights' unit across four schools!</p>
+                                    </div>
+                                    <div className="p-5 bg-slate-50 rounded-2xl">
+                                        <p className="text-sm font-bold text-slate-800">IGCSE Paper 2 Updates</p>
+                                        <p className="text-xs text-slate-500 mt-1">New mark schemes for Business and Economics have been uploaded to the shared repository.</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6">Your Subject Updates</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {userData.subjects.map(s => (
+                                        <div key={s} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                                            <span className="text-xs font-bold text-slate-700">{s}</span>
+                                            <span className="text-[9px] font-black bg-white px-2 py-1 rounded-full shadow-sm text-indigo-600 uppercase tracking-tighter">No New Files</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        </div>
+
+                        {/* PD & Events Column */}
+                        <div className="space-y-8">
+                            <section className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-xl">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-indigo-400 mb-6">Upcoming PD & Events</h3>
+                                <div className="space-y-6">
+                                    <div className="flex gap-4 items-center">
+                                        <div className="bg-indigo-600/20 w-12 h-12 rounded-2xl flex flex-col items-center justify-center border border-indigo-500/30">
+                                            <span className="text-[10px] font-black uppercase">Dec</span>
+                                            <span className="text-lg font-black leading-none">22</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold">Curriculum Coffee</p>
+                                            <p className="text-[10px] text-slate-400 uppercase">Humanities Global Meeting</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 items-center opacity-50">
+                                        <div className="bg-slate-700 w-12 h-12 rounded-2xl flex flex-col items-center justify-center border border-slate-600">
+                                            <span className="text-[10px] font-black uppercase">Jan</span>
+                                            <span className="text-lg font-black leading-none">12</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold">PD: AI in Humanities</p>
+                                            <p className="text-[10px] text-slate-400 uppercase">Interactive Workshop</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button className="w-full mt-8 py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest transition-all">View All Events</button>
+                            </section>
+                        </div>
+                    </div>
                 </div>
+            );
+        };
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Column 1 & 2: Main Feed */}
-                    <div className="lg:col-span-2 space-y-8">
-                        
-                        {/* Humanities Foundation Feed */}
-                        <section className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Foundation Feed</h3>
-                                <span className="bg-emerald-100 text-emerald-600 text-[10px] font-black px-3 py-1 rounded-full uppercase">Live Notices</span>
-                            </div>
-                            <div className="space-y-4">
-                                <div className="p-4 bg-slate-50 rounded-2xl border-l-4 border-indigo-500">
-                                    <p className="text-sm font-bold text-slate-800">Celebration: IGCSE Geography Results</p>
-                                    <p className="text-xs text-slate-500 mt-1">Huge congratulations to the Shanghai team for the record-breaking 98% A*-C rate!</p>
-                                </div>
-                                <div className="p-4 bg-slate-50 rounded-2xl">
-                                    <p className="text-sm font-bold text-slate-800">New Philosophy Scheme of Work</p>
-                                    <p className="text-xs text-slate-500 mt-1">The Year 9 "Ethics in AI" module is now live and ready for use.</p>
-                                </div>
-                            </div>
-                        </section>
+        // --- MAIN APP COMPONENT ---
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [userData, setUserData] = useState(null);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [authMode, setAuthMode] = useState('login');
+            const [pendingUsers, setPendingUsers] = useState([]);
+            const [aiQuery, setAiQuery] = useState('');
+            const [aiResponse, setAiResponse] = useState('');
+            const [loading, setLoading] = useState(false);
 
-                        {/* Recent Updates (Followed Subjects) */}
-                        <section>
-                            <div className="flex items-center justify-between mb-4 px-2">
-                                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Resources For You</h3>
-                                <button className="text-[10px] font-black text-indigo-600 uppercase border-b-2 border-indigo-600">Edit Preferences</button>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {recentUpdates.length > 0 ? recentUpdates.map(res => (
-                                    <div key={res.id} className="bg-white p-6 rounded-3xl border border-slate-100 hover:shadow-lg transition-all">
-                                        <span className="text-[9px] font-black text-indigo-500 uppercase">{res.subject}</span>
-                                        <h4 className="font-bold text-slate-800 mt-1">{res.title}</h4>
-                                        <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase">Added by {res.author}</p>
-                                    </div>
-                                )) : (
-                                    <div className="col-span-2 py-10 text-center bg-slate-100 rounded-3xl border-2 border-dashed">
-                                        <p className="text-xs font-bold text-slate-400">FOLLOW SUBJECTS TO SEE UPDATES</p>
-                                    </div>
-                                )}
-                            </div>
-                        </section>
-                    </div>
+            useEffect(() => {
+                onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        const d = await getDoc(doc(db, "users", u.uid));
+                        if (d.exists()) { setUserData(d.data()); setUser(u); }
+                    } else { setUser(null); setUserData(null); }
+                });
+            }, []);
 
-                    {/* Column 3: Sidebar Info */}
-                    <div className="space-y-8">
-                        {/* Upcoming Events / PD */}
-                        <section className="bg-indigo-50 rounded-[2.5rem] p-8 border border-indigo-100">
-                            <h3 className="text-lg font-black text-indigo-900 uppercase tracking-tighter mb-6">Upcoming PD</h3>
-                            <div className="space-y-6">
-                                <div className="flex gap-4">
-                                    <div className="bg-white w-12 h-12 rounded-2xl flex flex-col items-center justify-center shadow-sm shrink-0">
-                                        <span className="text-[10px] font-black text-indigo-600 uppercase">Jan</span>
-                                        <span className="text-lg font-black text-slate-800 leading-none">15</span>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-800">IB Workshop</p>
-                                        <p className="text-[10px] text-slate-500 font-medium">Internal Assessment Moderation</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-4 opacity-60">
-                                    <div className="bg-white w-12 h-12 rounded-2xl flex flex-col items-center justify-center shadow-sm shrink-0">
-                                        <span className="text-[10px] font-black text-indigo-600 uppercase">Feb</span>
-                                        <span className="text-lg font-black text-slate-800 leading-none">02</span>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-800">Global Humanities Cafe</p>
-                                        <p className="text-[10px] text-slate-500 font-medium">Topic: Decolonizing the Curriculum</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <button className="w-full mt-8 py-3 bg-white rounded-2xl text-[10px] font-black text-indigo-600 uppercase shadow-sm">View Calendar</button>
-                        </section>
+            useEffect(() => {
+                if (userData?.role === 'ADMIN') {
+                    const q = query(collection(db, "users"), where("isApproved", "==", false));
+                    onSnapshot(q, (s) => setPendingUsers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+                }
+            }, [userData]);
+
+            const handleAIRequest = async () => {
+                if (!aiQuery) return;
+                setLoading(true);
+                try {
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    const result = await model.generateContent(aiQuery);
+                    setAiResponse(result.response.text());
+                } catch (e) { setAiResponse("AI Error: Verify your Gemini API Key."); }
+                setLoading(false);
+            };
+
+            const handleAuth = async (e) => {
+                e.preventDefault();
+                const email = e.target.email.value;
+                try {
+                    if (authMode === 'signup') {
+                        const { user: newUser } = await createUserWithEmailAndPassword(auth, email, e.target.password.value);
+                        const isMaster = email.toLowerCase() === MASTER_EMAIL;
+                        const profile = {
+                            uid: newUser.uid, name: e.target.fullname.value, email,
+                            school: e.target.school.value, subjects: Array.from(e.target.subjects.selectedOptions).map(o => o.value),
+                            role: isMaster ? 'ADMIN' : 'STAFF', isApproved: isMaster
+                        };
+                        await setDoc(doc(db, "users", newUser.uid), profile);
+                    } else { await signInWithEmailAndPassword(auth, email, e.target.password.value); }
+                } catch (err) { alert(err.message); }
+            };
+
+            if (!user) return (
+                <div className="h-screen flex items-center justify-center bg-[#0f172a] p-6">
+                    <div className="glass p-12 rounded-[3.5rem] w-full max-w-md text-center animate-in">
+                        <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-2xl shadow-indigo-500/20"><i className="fa-solid fa-landmark text-2xl"></i></div>
+                        <h2 className="text-3xl font-black text-slate-800 mb-2">YCYW Humanities Portal</h2>
+                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-10">Shared Staff Network</p>
+                        <form onSubmit={handleAuth} className="space-y-4 text-left">
+                            {authMode === 'signup' && (
+                                <>
+                                    <input name="fullname" placeholder="Full Name" className="w-full p-4 rounded-2xl border outline-none" required />
+                                    <input name="school" placeholder="School Location" className="w-full p-4 rounded-2xl border outline-none" required />
+                                    <select name="subjects" multiple className="w-full p-3 rounded-2xl border h-24 text-xs outline-none" required>
+                                        {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </>
+                            )}
+                            <input name="email" type="email" placeholder="Work Email" defaultValue={authMode === 'login' ? MASTER_EMAIL : ""} className="w-full p-4 rounded-2xl border outline-none" required />
+                            <input name="password" type="password" placeholder="Password" defaultValue={authMode === 'login' ? "Camkel30" : ""} className="w-full p-4 rounded-2xl border outline-none" required />
+                            <button className="w-full bg-indigo-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-500/20 transition-all">
+                                {authMode === 'login' ? 'Login' : 'Create Account'}
+                            </button>
+                        </form>
+                        <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-widest underline">
+                            {authMode === 'login' ? "Need Access? Request Account" : "Back to Login"}
+                        </button>
                     </div>
                 </div>
-            </div>
-        );
-    };
-</script>
+            );
+
+            if (!userData?.isApproved) return (
+                <div className="h-screen flex flex-col items-center justify-center p-10 text-center animate-in">
+                    <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mb-6"><i className="fa-solid fa-user-shield"></i></div>
+                    <h2 className="text-2xl font-black text-slate-800">Account Pending Approval</h2>
+                    <p className="text-slate-500 max-w-sm mt-2 font-medium">Please wait for Kelsey Lowe to activate your portal access.</p>
+                    <button onClick={() => signOut(auth)} className="mt-8 text-xs font-black text-indigo-600 uppercase tracking-widest">Sign Out</button>
+                </div>
+            );
+
+            return (
+                <div className="flex h-screen bg-slate-50 overflow-hidden">
+                    <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl">
+                        <div className="p-8 flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center"><i className="fa-solid fa-landmark text-sm"></i></div>
+                            <span className="font-black text-[11px] text-white uppercase tracking-tighter">YCYW Humanities</span>
+                        </div>
+                        <nav className="flex-1 px-4 space-y-2 mt-4">
+                            {[
+                                { id: 'dashboard', icon: 'fa-gauge', label: 'Dashboard' },
+                                { id: 'years-7-9', icon: 'fa-seedling', label: 'Years 7 - 9' },
+                                { id: 'igcse', icon: 'fa-book-bookmark', label: 'IGCSE' },
+                                { id: 'ib', icon: 'fa-graduation-cap', label: 'IB / A-Level' },
+                                { id: 'ai', icon: 'fa-robot', label: 'AI Assistant' },
+                                { id: 'admin', icon: 'fa-shield-halved', label: 'Admin Hub', adminOnly: true }
+                            ].map(tab => (
+                                (!tab.adminOnly || userData.role === 'ADMIN') && (
+                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                        <i className={`fa-solid ${tab.icon} text-sm`}></i>
+                                        <span className="font-bold text-xs uppercase tracking-widest">{tab.label}</span>
+                                    </button>
+                                )
+                            ))}
+                        </nav>
+                        <div className="p-6"><button onClick={() => signOut(auth)} className="w-full p-4 bg-slate-800 rounded-2xl text-slate-400 hover:text-red-500 font-black text-[10px] uppercase">Logout</button></div>
+                    </div>
+                    
+                    <div className="flex-1 flex flex-col min-w-0">
+                        <header className="h-20 bg-white border-b flex items-center justify-between px-10 shrink-0 shadow-sm">
+                            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{activeTab}</h2>
+                            <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black text-slate-800 uppercase leading-none">{userData.name}</p>
+                                    <p className="text-[9px] font-bold text-indigo-500 uppercase mt-1">{userData.school}</p>
+                                </div>
+                                <div className="w-10 h-10 bg-indigo-50 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-indigo-600 font-black text-xs uppercase">{userData.name[0]}</div>
+                            </div>
+                        </header>
+
+                        <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc]">
+                            {activeTab === 'dashboard' ? (
+                                <DashboardView userData={userData} />
+                            ) : activeTab === 'ai' ? (
+                                <div className="max-w-3xl mx-auto space-y-6 animate-in">
+                                    <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                                        <h3 className="text-2xl font-black mb-2">Humanities AI Tutor</h3>
+                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-8">Curriculum-aligned Assistance</p>
+                                        <div className="flex gap-2">
+                                            <input className="flex-1 p-5 bg-slate-50 rounded-2xl border outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ask about curriculum design, source analysis, or topics..." onChange={e => setAiQuery(e.target.value)} />
+                                            <button onClick={handleAIRequest} className="bg-indigo-600 text-white px-10 rounded-2xl font-black uppercase tracking-widest">{loading ? '...' : 'Ask'}</button>
+                                        </div>
+                                        {aiResponse && <div className="mt-8 p-8 bg-slate-50 border border-slate-100 rounded-[2rem] text-slate-700 whitespace-pre-wrap text-sm leading-relaxed shadow-inner">{aiResponse}</div>}
+                                    </div>
+                                </div>
+                            ) : activeTab === 'admin' ? (
+                                <div className="space-y-6 max-w-4xl animate-in">
+                                    <h3 className="text-2xl font-black text-slate-800">Verification Hub</h3>
+                                    {pendingUsers.map(u => (
+                                        <div key={u.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+                                            <div className="flex-1">
+                                                <p className="font-black text-slate-800 text-lg">{u.name}</p>
+                                                <p className="text-xs text-indigo-500 font-bold mb-3 uppercase tracking-tighter">{u.email} • {u.school}</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {u.subjects?.map(s => <span key={s} className="text-[8px] bg-indigo-50 text-indigo-500 px-2 py-1 rounded-md font-black uppercase">{s}</span>)}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => updateDoc(doc(db, "users", u.id), {isApproved: true, role: 'STAFF'})} className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-700">Approve Staff</button>
+                                                <button onClick={() => updateDoc(doc(db, "users", u.id), {isApproved: true, role: 'ADMIN'})} className="bg-amber-500 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase hover:bg-amber-600">Approve Admin</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {pendingUsers.length === 0 && <div className="text-center py-20 bg-white rounded-[3rem] border border-dashed"><p className="text-slate-300 font-black uppercase text-xs">No Pending Requests</p></div>}
+                                </div>
+                            ) : (
+                                <div className="text-center py-40 bg-white rounded-[4rem] border-2 border-dashed border-slate-200">
+                                    <i className="fa-solid fa-folder-open text-4xl text-slate-200 mb-4 block"></i>
+                                    <p className="text-slate-300 font-black uppercase text-xs tracking-[0.4em]">Repository Loading...</p>
+                                </div>
+                            )}
+                        </main>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
