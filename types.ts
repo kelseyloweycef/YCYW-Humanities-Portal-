@@ -30,7 +30,7 @@ export interface User {
   avatar?: string;
   school?: string;
   subjectsTaught?: Subject[];
-  subscriptions: string[]; // List of subject names or IDs the user follows
+  subscriptions: string[];
   notifications: Notification[];
 }
 
@@ -120,14 +120,6 @@ export interface ForumReply {
   author: string;
   content: string;
   date: string;
-}
-
-export interface CurriculumSuggestion {
-  id: string;
-  author: string;
-  content: string;
-  date: string;
-  yearGroup: YearGroup;
 }
 
 export interface NavItem {

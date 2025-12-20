@@ -68,7 +68,8 @@ const YearGroupView: React.FC<YearGroupViewProps> = ({
   }, [selectedCurriculum, view]);
 
   const showModerationTab = mode === 'igcse' && MODERATION_SUBJECTS.includes(selectedSubTab as Subject);
-  // User request: IA moderation tab ONLY for IB selection, not A-Level
+  
+  // Logic: IA moderation tab ONLY for IB selection, not A-Level
   const showIATab = mode === 'ib' && selectedCurriculum === 'IB';
   
   const showCurriculumSwitcher = mode === 'ib' && 
