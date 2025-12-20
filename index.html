@@ -14,8 +14,10 @@
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; margin: 0; }
         .mesh-bg { background: linear-gradient(135deg, #4f46e5 0%, #1e293b 100%); position: relative; overflow: hidden; }
         .mesh-circle { position: absolute; top: -20%; right: -10%; width: 300px; height: 300px; background: #6366f1; border-radius: 50%; filter: blur(80px); opacity: 0.4; }
-        .animate-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -23,7 +25,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, where, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -36,42 +38,32 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        window.FB = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, doc, setDoc, getDoc, collection, onSnapshot, query, where, updateDoc };
+        window.FB = { auth: getAuth(app), db: getFirestore(app), onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, doc, setDoc, getDoc, collection, onSnapshot, query, where, updateDoc };
     </script>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
-        const SUBJECTS = ["History", "Geography", "Business", "Economics", "Psychology", "Sociology", "Enterprise", "Philosophy", "General Humanities"];
         const MASTER_EMAIL = "kelsey.lowe@hk.ycef.com";
 
         const App = () => {
             const [user, setUser] = useState(null);
             const [userData, setUserData] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
-            const [authMode, setAuthMode] = useState('login');
-            const [pendingUsers, setPendingUsers] = useState([]);
+            const [subTab, setSubTab] = useState(null);
+            const [expanded, setExpanded] = useState(null); // Tracks which accordion is open
             const [logoUrl, setLogoUrl] = useState('');
+            const [pendingUsers, setPendingUsers] = useState([]);
 
             useEffect(() => {
-                const unsubscribe = window.FB.onAuthStateChanged(window.FB.auth, async (u) => {
+                const unsub = window.FB.onAuthStateChanged(window.FB.auth, async (u) => {
                     if (u) {
                         const d = await window.FB.getDoc(window.FB.doc(window.FB.db, "users", u.uid));
-                        if (d.exists()) {
-                            setUserData(d.data());
-                            setUser(u);
-                        }
-                    } else {
-                        setUser(null);
-                        setUserData(null);
-                    }
+                        if (d.exists()) { setUserData(d.data()); setUser(u); }
+                    } else { setUser(null); setUserData(null); }
                 });
-                return () => unsubscribe();
+                return () => unsub();
             }, []);
 
-            // Listen for Logo Changes
             useEffect(() => {
                 const unsub = window.FB.onSnapshot(window.FB.doc(window.FB.db, "settings", "branding"), (doc) => {
                     if (doc.exists()) setLogoUrl(doc.data().logoUrl);
@@ -82,174 +74,108 @@
             useEffect(() => {
                 if (userData?.role === 'ADMIN') {
                     const q = window.FB.query(window.FB.collection(window.FB.db, "users"), window.FB.where("isApproved", "==", false));
-                    return window.FB.onSnapshot(q, (s) => {
-                        setPendingUsers(s.docs.map(d => ({ id: d.id, ...d.data() })));
-                    });
+                    return window.FB.onSnapshot(q, (s) => setPendingUsers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
                 }
             }, [userData]);
 
-            const handleAuth = async (e) => {
-                e.preventDefault();
-                const email = e.target.email.value;
-                const pass = e.target.password.value;
-                try {
-                    if (authMode === 'signup') {
-                        const { user: newUser } = await window.FB.createUserWithEmailAndPassword(window.FB.auth, email, pass);
-                        const isMaster = email.toLowerCase() === MASTER_EMAIL;
-                        const profile = {
-                            uid: newUser.uid,
-                            name: e.target.fullname.value,
-                            email,
-                            school: e.target.school.value,
-                            subjects: Array.from(e.target.subjects.selectedOptions).map(o => o.value),
-                            role: isMaster ? 'ADMIN' : 'STAFF',
-                            isApproved: isMaster
-                        };
-                        await window.FB.setDoc(window.FB.doc(window.FB.db, "users", newUser.uid), profile);
-                        if (!isMaster) alert("Success! Your account is now pending admin approval.");
-                    } else {
-                        await window.FB.signInWithEmailAndPassword(window.FB.auth, email, pass);
-                    }
-                } catch (err) { alert(err.message); }
-            };
+            const navConfig = [
+                { id: 'dashboard', label: 'Dashboard', icon: 'fa-gauge' },
+                { id: 'primary', label: 'Primary', icon: 'fa-child', subs: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6'] },
+                { id: 'years7-9', label: 'Years 7-9', icon: 'fa-seedling' },
+                { id: 'igcse', label: 'IGCSE', icon: 'fa-book-bookmark', subs: ['History', 'Geography', 'Psychology', 'Sociology', 'Economics', 'Business'] },
+                { id: 'ib-alevel', label: 'IB / A-Level', icon: 'fa-graduation-cap', subs: ['History', 'Geography', 'Psychology', 'Economics', 'Business', 'Philosophy'] },
+                { id: 'admin', label: 'Admin Hub', icon: 'fa-shield-halved', adminOnly: true }
+            ];
 
-            const updateLogo = async (e) => {
-                e.preventDefault();
-                const newUrl = e.target.logoInput.value;
-                await window.FB.setDoc(window.FB.doc(window.FB.db, "settings", "branding"), { logoUrl: newUrl });
-                alert("Global Logo Updated!");
-            };
-
-            if (!user) return (
-                <div className="h-screen flex items-center justify-center bg-[#0f172a] p-6">
-                    <div className="bg-white p-10 rounded-[3rem] w-full max-w-md shadow-2xl text-center animate-in">
-                        {logoUrl ? (
-                            <img src={logoUrl} className="h-20 mx-auto mb-6 object-contain" alt="Logo" />
-                        ) : (
-                            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl mx-auto mb-6">
-                                <i className="fa-solid fa-landmark"></i>
-                            </div>
-                        )}
-                        <h2 className="text-3xl font-black text-slate-800 mb-2 leading-tight">YCYW Humanities Portal</h2>
-                        <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-8">{authMode}</p>
-                        <form onSubmit={handleAuth} className="space-y-4 text-left">
-                            {authMode === 'signup' && (
-                                <>
-                                    <input name="fullname" placeholder="Full Name" className="w-full p-4 rounded-2xl border bg-slate-50 outline-none" required />
-                                    <input name="school" placeholder="School Location" className="w-full p-4 rounded-2xl border bg-slate-50 outline-none" required />
-                                    <select name="subjects" multiple className="w-full p-3 rounded-2xl border bg-slate-50 h-24 text-xs outline-none" required>
-                                        {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                </>
-                            )}
-                            <input name="email" type="email" placeholder="Work Email" defaultValue={authMode === 'login' ? MASTER_EMAIL : ""} className="w-full p-4 rounded-2xl border bg-slate-50 outline-none" required />
-                            <input name="password" type="password" placeholder="Password" defaultValue={authMode === 'login' ? "Camkel30" : ""} className="w-full p-4 rounded-2xl border bg-slate-50 outline-none" required />
-                            <button className="w-full bg-indigo-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-indigo-500/30">Submit</button>
-                        </form>
-                        <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="mt-6 text-[10px] font-bold text-slate-400 uppercase">
-                           {authMode === 'login' ? 'Need Access? Sign Up' : 'Back to Login'}
-                        </button>
-                    </div>
-                </div>
-            );
-
-            if (!userData?.isApproved) return (
-                <div className="h-screen flex flex-col items-center justify-center text-center p-10 animate-in">
-                    <i className="fa-solid fa-hourglass-half text-4xl text-amber-500 mb-4"></i>
-                    <h2 className="text-2xl font-black text-slate-800">Awaiting Verification</h2>
-                    <p className="text-slate-500 mt-2">Your request is being reviewed by the curriculum team.</p>
-                    <button onClick={() => window.FB.signOut(window.FB.auth)} className="mt-8 text-indigo-600 font-bold underline text-sm uppercase">Sign Out</button>
-                </div>
-            );
+            if (!user) return <div className="h-screen flex items-center justify-center bg-[#0f172a] text-white">Please Login on your browser.</div>;
 
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden">
-                    <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl transition-all">
+                    {/* Sidebar */}
+                    <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl custom-scrollbar overflow-y-auto">
                         <div className="p-8 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden shrink-0 shadow-lg">
+                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shrink-0">
                                 {logoUrl ? <img src={logoUrl} className="w-full h-full object-contain p-1" /> : <i className="fa-solid fa-landmark text-indigo-600"></i>}
                             </div>
-                            <span className="font-black text-[11px] uppercase tracking-tighter text-indigo-100">YCYW Humanities</span>
+                            <span className="font-black text-[11px] uppercase tracking-tighter">YCYW Humanities</span>
                         </div>
-                        <nav className="flex-1 px-4 space-y-2 mt-4">
-                            {['dashboard', 'admin'].map(tab => (
-                                (tab !== 'admin' || userData.role === 'ADMIN') && (
-                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-left p-4 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-indigo-600 shadow-xl' : 'text-slate-400 hover:bg-slate-800'}`}>
-                                        <i className={`fa-solid ${tab === 'dashboard' ? 'fa-gauge' : 'fa-shield-halved'} mr-3`}></i>
-                                        {tab}
-                                    </button>
-                                )
-                            ))}
+
+                        <nav className="flex-1 px-4 space-y-1 mb-10">
+                            {navConfig.map(item => {
+                                if (item.adminOnly && userData.role !== 'ADMIN') return null;
+                                const isExpanded = expanded === item.id;
+
+                                return (
+                                    <div key={item.id} className="space-y-1">
+                                        <button 
+                                            onClick={() => {
+                                                if (item.subs) { setExpanded(isExpanded ? null : item.id); } 
+                                                else { setActiveTab(item.id); setSubTab(null); setExpanded(null); }
+                                            }}
+                                            className={`w-full flex items-center justify-between p-4 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${activeTab === item.id && !subTab ? 'bg-indigo-600 shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <i className={`fa-solid ${item.icon} w-4 text-center`}></i>
+                                                {item.label}
+                                            </div>
+                                            {item.subs && <i className={`fa-solid fa-chevron-down text-[10px] transition-transform ${isExpanded ? 'rotate-180' : ''}`}></i>}
+                                        </button>
+
+                                        {item.subs && isExpanded && (
+                                            <div className="ml-6 space-y-1 animate-in">
+                                                {item.subs.map(sub => (
+                                                    <button 
+                                                        key={sub}
+                                                        onClick={() => { setActiveTab(item.id); setSubTab(sub); }}
+                                                        className={`w-full text-left p-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${subTab === sub ? 'text-indigo-400 bg-slate-800/50' : 'text-slate-500 hover:text-slate-300'}`}
+                                                    >
+                                                        {sub}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </nav>
-                        <div className="p-6"><button onClick={() => window.FB.signOut(window.FB.auth)} className="w-full p-4 bg-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-red-400">Logout</button></div>
+                        <div className="p-4"><button onClick={() => window.FB.signOut(window.FB.auth)} className="w-full p-4 bg-slate-800 rounded-2xl text-[10px] font-black uppercase hover:text-red-400">Logout</button></div>
                     </div>
-                    
+
+                    {/* Main Content */}
                     <div className="flex-1 flex flex-col overflow-hidden">
                         <header className="h-20 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm">
-                            <h2 className="font-black text-slate-800 uppercase tracking-tight text-xl">{activeTab}</h2>
-                            <div className="flex items-center gap-4">
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black text-slate-800 leading-none uppercase">{userData.name}</p>
-                                    <p className="text-[9px] font-bold text-indigo-500 uppercase mt-1 tracking-widest">{userData.school}</p>
-                                </div>
-                                <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-black text-indigo-600 border border-indigo-100 uppercase text-xs">
-                                    {userData.name[0]}
-                                </div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="font-black text-slate-800 uppercase tracking-tight text-xl">{activeTab}</h2>
+                                {subTab && <i className="fa-solid fa-chevron-right text-slate-300 text-xs mx-2"></i>}
+                                {subTab && <span className="text-indigo-600 font-black uppercase text-sm">{subTab}</span>}
                             </div>
                         </header>
 
-                        <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc]">
+                        <main className="flex-1 overflow-y-auto p-10">
                             {activeTab === 'dashboard' ? (
                                 <div className="space-y-8 animate-in">
                                     <div className="mesh-bg rounded-[3rem] p-12 text-white shadow-2xl relative">
                                         <div className="mesh-circle"></div>
-                                        <h1 className="text-4xl font-black relative z-10">Welcome, {userData.name.split(' ')[0]}!</h1>
-                                        <p className="mt-2 text-indigo-100 relative z-10 opacity-90 max-w-lg">Explore the latest curriculum materials and collaborate with your fellow Humanities staff across the YCYW network.</p>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                                            <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest mb-4">Foundation Feed</h3>
-                                            <p className="text-sm text-slate-600 leading-relaxed">Please check your subject folders for the latest IGCSE and IB moderation guides.</p>
-                                        </div>
-                                        <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-xl">
-                                            <h3 className="font-black text-indigo-400 uppercase text-[10px] tracking-widest mb-4">Upcoming Events</h3>
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-sm">22</div>
-                                                <p className="text-sm font-bold">Humanities Global Coffee Morning</p>
-                                            </div>
-                                        </div>
+                                        <h1 className="text-4xl font-black relative z-10">Welcome, {userData?.name.split(' ')[0]}!</h1>
+                                        <p className="mt-2 text-indigo-100 relative z-10 opacity-90">YCYW Global Humanities Repository</p>
                                     </div>
                                 </div>
+                            ) : activeTab === 'admin' ? (
+                                <div className="space-y-4 animate-in">
+                                    <h3 className="text-2xl font-black">Admin: Approval Queue</h3>
+                                    {pendingUsers.length === 0 ? <p className="text-slate-400">No pending staff.</p> : pendingUsers.map(u => (
+                                        <div key={u.id} className="bg-white p-6 rounded-3xl border flex justify-between items-center">
+                                            <div><p className="font-black uppercase text-sm">{u.name}</p><p className="text-xs text-slate-400">{u.email}</p></div>
+                                            <button onClick={() => window.FB.updateDoc(window.FB.doc(window.FB.db, "users", u.id), {isApproved: true, role: 'STAFF'})} className="bg-indigo-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase">Approve</button>
+                                        </div>
+                                    ))}
+                                </div>
                             ) : (
-                                <div className="space-y-8 animate-in">
-                                    <section className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm max-w-3xl">
-                                        <h3 className="text-2xl font-black text-slate-800 mb-6">Staff Branding</h3>
-                                        <form onSubmit={updateLogo} className="space-y-4">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Global Logo URL</label>
-                                            <div className="flex gap-2">
-                                                <input name="logoInput" defaultValue={logoUrl} placeholder="https://image-url.png" className="flex-1 p-4 bg-slate-50 rounded-2xl border outline-none font-medium" />
-                                                <button className="bg-indigo-600 text-white px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-500/30">Update</button>
-                                            </div>
-                                            <p className="text-[10px] text-slate-400 px-2 italic">Paste a link to a square or rectangular image (PNG/JPG) to update the portal's global icon.</p>
-                                        </form>
-                                    </section>
-
-                                    <section className="space-y-4 max-w-3xl">
-                                        <h3 className="text-2xl font-black text-slate-800">Verification Hub</h3>
-                                        {pendingUsers.map(u => (
-                                            <div key={u.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
-                                                <div className="flex-1">
-                                                    <p className="font-black text-slate-800 text-lg">{u.name}</p>
-                                                    <p className="text-xs text-indigo-500 font-bold mb-3 uppercase tracking-tighter">{u.email} • {u.school}</p>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {u.subjects?.map(s => <span key={s} className="text-[8px] bg-indigo-50 text-indigo-500 px-2 py-1 rounded-md font-black uppercase">{s}</span>)}
-                                                    </div>
-                                                </div>
-                                                <button onClick={() => window.FB.updateDoc(window.FB.doc(window.FB.db, "users", u.id), {isApproved: true, role: 'STAFF'})} className="bg-indigo-600 text-white px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20">Approve Access</button>
-                                            </div>
-                                        ))}
-                                        {pendingUsers.length === 0 && <p className="text-slate-400 font-black uppercase text-xs tracking-[0.3em] text-center py-20 bg-white rounded-[3rem] border border-dashed">No pending staff requests</p>}
-                                    </section>
+                                <div className="text-center py-40 bg-white rounded-[4rem] border-2 border-dashed border-slate-200 animate-in">
+                                    <i className="fa-solid fa-folder-open text-4xl text-slate-200 mb-4 block"></i>
+                                    <p className="text-slate-300 font-black uppercase text-xs tracking-[0.4em]">
+                                        Content for {activeTab} {subTab ? `/ ${subTab}` : ''} coming soon.
+                                    </p>
                                 </div>
                             )}
                         </main>
