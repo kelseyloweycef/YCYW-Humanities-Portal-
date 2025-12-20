@@ -95,7 +95,7 @@
                             isApproved: isMaster
                         };
                         await setDoc(doc(db, "users", newUser.uid), profile);
-                        if (!isMaster) alert("Success! Awaiting Admin activation.");
+                        if (!isMaster) alert("Registration Successful. Please wait for Kelsey Lowe to activate your account.");
                     } else {
                         await signInWithEmailAndPassword(auth, email, password);
                     }
@@ -103,54 +103,58 @@
             };
 
             if (!user) return (
-                <div className="h-screen flex items-center justify-center bg-slate-900 p-6">
-                    <div className="glass p-12 rounded-[3.5rem] w-full max-w-md animate-in text-center">
-                        <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl mx-auto mb-6 shadow-xl shadow-indigo-500/30">
-                            <i className="fa-solid fa-landmark"></i>
+                <div className="h-screen flex items-center justify-center bg-[#0f172a] p-6">
+                    <div className="glass p-12 rounded-[3.5rem] w-full max-w-md animate-in text-center border-white/20">
+                        {/* Branding Header */}
+                        <div className="mb-10">
+                            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl mx-auto mb-4 shadow-xl shadow-indigo-500/40">
+                                <i className="fa-solid fa-landmark"></i>
+                            </div>
+                            <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-tight">YCYW Humanities Portal</h2>
+                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-2">Shared Staff Network</p>
                         </div>
-                        <h2 className="text-3xl font-black text-slate-800 mb-2">YCYW Humanities Portal</h2>
-                        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em] mb-8">Staff Network Access</p>
                         
                         <form onSubmit={handleAuth} className="space-y-4 text-left">
                             {authMode === 'signup' && (
                                 <>
-                                    <input name="fullname" placeholder="Full Name" className="w-full p-4 rounded-2xl border bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" required />
-                                    <input name="school" placeholder="School (e.g. YWIES Shanghai)" className="w-full p-4 rounded-2xl border bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" required />
+                                    <input name="fullname" placeholder="Full Name" className="w-full p-4 rounded-2xl border bg-white outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                    <input name="school" placeholder="School (e.g. YWIES Hong Kong)" className="w-full p-4 rounded-2xl border bg-white outline-none focus:ring-2 focus:ring-indigo-500" required />
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase px-2">Subjects Taught (Hold Ctrl/Cmd)</label>
-                                        <select name="subjects" multiple className="w-full p-3 rounded-2xl border bg-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                                            {SUBJECTS.map(s => <option key={s} value={s} className="p-1">{s}</option>)}
+                                        <label className="text-[9px] font-black text-slate-400 uppercase px-2">Subjects (Hold Ctrl/Cmd)</label>
+                                        <select name="subjects" multiple className="w-full p-3 rounded-2xl border bg-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none h-24" required>
+                                            {SUBJECTS.map(s => <option key={s} value={s} className="py-1 px-2">{s}</option>)}
                                         </select>
                                     </div>
                                 </>
                             )}
-                            <input name="email" type="email" placeholder="Work Email" defaultValue={authMode === 'login' ? MASTER_EMAIL : ""} className="w-full p-4 rounded-2xl border bg-white focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                            <input name="password" type="password" placeholder="Password" defaultValue={authMode === 'login' ? "Camkel30" : ""} className="w-full p-4 rounded-2xl border bg-white focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                            <button className="w-full bg-indigo-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 shadow-xl transition-all">
-                                {authMode === 'login' ? 'Login' : 'Request Access'}
+                            <input name="email" type="email" placeholder="Work Email" defaultValue={authMode === 'login' ? MASTER_EMAIL : ""} className="w-full p-4 rounded-2xl border bg-white outline-none focus:ring-2 focus:ring-indigo-500" required />
+                            <input name="password" type="password" placeholder="Password" defaultValue={authMode === 'login' ? "Camkel30" : ""} className="w-full p-4 rounded-2xl border bg-white outline-none focus:ring-2 focus:ring-indigo-500" required />
+                            <button className="w-full bg-indigo-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-500/20 transition-all">
+                                {authMode === 'login' ? 'Login' : 'Create Account'}
                             </button>
                         </form>
                         <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors">
-                            {authMode === 'login' ? "Don't have an account? Sign Up" : "Already registered? Back to Login"}
+                            {authMode === 'login' ? "Need Access? Request Account" : "Back to Login"}
                         </button>
                     </div>
                 </div>
             );
 
+            // Access Granted Content...
             if (!userData?.isApproved) return (
                 <div className="h-screen flex flex-col items-center justify-center p-10 text-center animate-in">
-                    <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mb-6"><i className="fa-solid fa-user-clock"></i></div>
-                    <h2 className="text-2xl font-black text-slate-800">Account Pending</h2>
-                    <p className="text-slate-500 max-w-sm mt-2 font-medium">Your request for the YCYW Humanities Portal has been sent. Kelsey Lowe will verify your details shortly.</p>
+                    <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mb-6"><i className="fa-solid fa-shield-halved"></i></div>
+                    <h2 className="text-2xl font-black text-slate-800">Verification Pending</h2>
+                    <p className="text-slate-500 max-w-sm mt-2 font-medium">Your account request for the YCYW Humanities Portal has been received. Please wait for Kelsey Lowe to activate your profile.</p>
                     <button onClick={() => signOut(auth)} className="mt-8 text-xs font-black text-indigo-600 uppercase tracking-widest">Sign Out</button>
                 </div>
             );
 
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden">
-                    <div className="w-64 bg-slate-900 text-white flex flex-col h-screen shrink-0 shadow-2xl">
+                    <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl">
                         <div className="p-8 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20"><i className="fa-solid fa-landmark text-sm"></i></div>
+                            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center"><i className="fa-solid fa-landmark text-sm"></i></div>
                             <span className="font-black text-[11px] text-white uppercase tracking-tighter">YCYW Humanities</span>
                         </div>
                         <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -167,43 +171,39 @@
                     </div>
                     
                     <div className="flex-1 flex flex-col min-w-0">
-                        <header className="h-20 bg-white border-b flex items-center justify-between px-10 shrink-0 shadow-sm">
+                        <header className="h-20 bg-white border-b flex items-center justify-between px-10 shrink-0">
                             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{activeTab}</h2>
                             <div className="flex items-center gap-4">
                                 <div className="text-right">
                                     <p className="text-[10px] font-black text-slate-800 uppercase leading-none">{userData.name}</p>
-                                    <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest mt-1">{userData.school}</p>
+                                    <p className="text-[9px] font-bold text-indigo-500 uppercase mt-1">{userData.school}</p>
                                 </div>
-                                <div className="w-10 h-10 bg-indigo-50 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-indigo-600 font-black text-xs uppercase">{userData.name[0]}</div>
                             </div>
                         </header>
 
                         <main className="flex-1 overflow-y-auto p-10">
                             {activeTab === 'admin' ? (
                                 <div className="space-y-6 max-w-4xl">
-                                    <h3 className="text-2xl font-black text-slate-800">Verification Requests</h3>
+                                    <h3 className="text-2xl font-black text-slate-800">Pending Staff Requests</h3>
                                     {pendingUsers.map(u => (
                                         <div key={u.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 animate-in">
                                             <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <p className="font-black text-slate-800 text-lg">{u.name}</p>
-                                                    <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-black uppercase tracking-widest">{u.school}</span>
-                                                </div>
-                                                <p className="text-xs text-indigo-500 font-bold mb-3">{u.email}</p>
+                                                <p className="font-black text-slate-800 text-lg">{u.name}</p>
+                                                <p className="text-xs text-indigo-500 font-bold mb-3">{u.email} • {u.school}</p>
                                                 <div className="flex flex-wrap gap-1">
-                                                    {u.subjects?.map(s => <span key={s} className="text-[8px] bg-indigo-50 text-indigo-500 px-2 py-1 rounded-md font-black uppercase tracking-tighter">{s}</span>)}
+                                                    {u.subjects?.map(s => <span key={s} className="text-[8px] bg-indigo-50 text-indigo-500 px-2 py-1 rounded-md font-black uppercase">{s}</span>)}
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button onClick={() => updateDoc(doc(db, "users", u.id), {isApproved: true, role: 'STAFF'})} className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-700 shadow-lg shadow-indigo-500/20">Approve Teacher</button>
-                                                <button onClick={() => updateDoc(doc(db, "users", u.id), {isApproved: true, role: 'ADMIN'})} className="bg-amber-500 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase hover:bg-amber-600">Approve Admin</button>
+                                                <button onClick={() => updateDoc(doc(db, "users", u.id), {isApproved: true, role: 'STAFF'})} className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase">Approve Staff</button>
+                                                <button onClick={() => updateDoc(doc(db, "users", u.id), {isApproved: true, role: 'ADMIN'})} className="bg-amber-500 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase">Approve Admin</button>
                                             </div>
                                         </div>
                                     ))}
-                                    {pendingUsers.length === 0 && <div className="text-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-slate-200"><p className="text-slate-300 font-black uppercase text-xs">No active verification requests</p></div>}
+                                    {pendingUsers.length === 0 && <div className="text-center py-24"><p className="text-slate-300 font-black uppercase text-xs">No pending requests</p></div>}
                                 </div>
                             ) : (
-                                <div className="text-center py-32 bg-white rounded-[4rem] border-2 border-dashed border-slate-200"><p className="text-slate-300 font-black uppercase text-xs tracking-[0.4em]">Repository content loading...</p></div>
+                                <div className="text-center py-32 bg-white rounded-[4rem] border-2 border-dashed border-slate-200"><p className="text-slate-300 font-black uppercase text-xs">Repository Loading...</p></div>
                             )}
                         </main>
                     </div>
