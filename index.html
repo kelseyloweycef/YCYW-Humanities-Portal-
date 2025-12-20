@@ -1,31 +1,90 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YCYW Humanities</title>
+    <title>YCYW Humanities Portal</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
-  }
-}
-</script>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom": "https://esm.sh/react-dom@18.2.0/client",
+        "firebase/app": "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js"
+      }
+    }
+    </script>
 </head>
 <body>
     <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "firebase/app";
+        import { getFirestore, collection, onSnapshot, query, orderBy } from "firebase/firestore";
+        import React, { useState, useEffect } from "react";
+        import { createRoot } from "react-dom";
+
+        // Your Firebase Config
+        const firebaseConfig = {
+          apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
+          authDomain: "ycyw-humanities-portal.firebaseapp.com",
+          projectId: "ycyw-humanities-portal",
+          storageBucket: "ycyw-humanities-portal.firebasestorage.app",
+          messagingSenderId: "141054228326",
+          appId: "1:141054228326:web:13248804cf5e407a163aa7",
+          measurementId: "G-NJPT0NP98T"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- PASTE YOUR YearGroupView COMPONENT BELOW THIS LINE ---
+
+        const YearGroupView = ({ resources, mode }) => {
+            // ... (The long code you shared earlier goes here)
+            return (
+                <div className="p-10">
+                    <h1 className="text-2xl font-black text-indigo-600">YCYW Resources</h1>
+                    <p className="text-slate-500">Mode: {mode}</p>
+                    {/* Add your full layout logic here */}
+                </div>
+            );
+        };
+
+        // --- MAIN APP COMPONENT ---
+        const App = () => {
+            const [resources, setResources] = useState([]);
+            const [mode, setMode] = useState('ib');
+
+            useEffect(() => {
+                const q = query(collection(db, "resources"));
+                const unsub = onSnapshot(q, (snapshot) => {
+                    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setResources(docs);
+                });
+                return () => unsub();
+            }, []);
+
+            return (
+                <div className="min-h-screen">
+                    <YearGroupView resources={resources} mode={mode} />
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
