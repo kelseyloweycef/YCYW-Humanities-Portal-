@@ -7,12 +7,13 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .animate-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 
     <script type="importmap">
@@ -35,7 +36,7 @@
         import React, { useState, useEffect } from "react";
         import { createRoot } from "react-dom";
 
-        // Your Firebase Config
+        // Firebase Configuration
         const firebaseConfig = {
           apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
           authDomain: "ycyw-humanities-portal.firebaseapp.com",
@@ -49,35 +50,134 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // --- PASTE YOUR YearGroupView COMPONENT BELOW THIS LINE ---
+        // --- ENUMS & CONSTANTS ---
+        const Subject = {
+            HISTORY: 'History', GEOGRAPHY: 'Geography', PSYCHOLOGY: 'Psychology',
+            SOCIOLOGY: 'Sociology', ECONOMICS: 'Economics', BUSINESS: 'Business',
+            ENTERPRISE: 'Enterprise', PHILOSOPHY: 'Philosophy'
+        };
 
-        const YearGroupView = ({ resources, mode }) => {
-            // ... (The long code you shared earlier goes here)
+        const YearGroup = {
+            YEAR_7: 'Year 7', YEAR_8: 'Year 8', YEAR_9: 'Year 9',
+            YEAR_10: 'Year 10', YEAR_11: 'Year 11', YEAR_12: 'Year 12', YEAR_13: 'Year 13'
+        };
+
+        const ResourceType = {
+            SCHEME_OF_WORK: 'Scheme of Work', ASSESSMENT: 'Assessment',
+            MARK_SCHEME: 'Mark Scheme', LESSON_PLAN: 'Lesson Plan',
+            PRESENTATION: 'Presentation', WORKSHEET: 'Worksheet',
+            EXAMPLE_WORK: 'Example Work', COURSEWORK: 'Coursework',
+            INTERNAL_ASSESSMENT: 'IA'
+        };
+
+        // --- COMPONENTS ---
+        const ResourceGrid = ({ resources, onResourceClick }) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {resources.map(res => (
+                    <div key={res.id} onClick={() => onResourceClick(res)} className="p-4 bg-white rounded-2xl border border-slate-200 hover:shadow-lg transition-all cursor-pointer">
+                        <div className="flex items-start justify-between">
+                            <h4 className="font-bold text-slate-800">{res.title}</h4>
+                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg font-black uppercase">{res.type}</span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-2">Added: {new Date(res.timestamp?.seconds * 1000).toLocaleDateString()}</p>
+                    </div>
+                ))}
+            </div>
+        );
+
+        const YearGroupView = ({ resources, mode, currentUser }) => {
+            const [selectedSubTab, setSelectedSubTab] = useState('');
+            const [selectedCurriculum, setSelectedCurriculum] = useState('IB');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [view, setView] = useState('resources');
+
+            useEffect(() => {
+                if (mode === 'years') setSelectedSubTab(YearGroup.YEAR_7);
+                else setSelectedSubTab(Subject.HISTORY);
+            }, [mode]);
+
+            const getFilteredResources = () => {
+                return resources.filter(res => {
+                    const searchMatch = res.title.toLowerCase().includes(searchTerm.toLowerCase());
+                    if (!searchMatch) return false;
+                    if (mode === 'years') return res.yearGroup === selectedSubTab;
+                    return res.subject === selectedSubTab;
+                });
+            };
+
+            const filtered = getFilteredResources();
+            const schemesOfWork = filtered.filter(r => r.type === ResourceType.SCHEME_OF_WORK);
+            const generalResources = filtered.filter(r => r.type !== ResourceType.SCHEME_OF_WORK);
+
             return (
-                <div className="p-10">
-                    <h1 className="text-2xl font-black text-indigo-600">YCYW Resources</h1>
-                    <p className="text-slate-500">Mode: {mode}</p>
-                    {/* Add your full layout logic here */}
+                <div className="space-y-8 animate-in pb-20">
+                    {/* Header Controls */}
+                    <div className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-30 py-4 border-b border-slate-200">
+                        <div className="flex flex-col lg:flex-row gap-4 items-center">
+                            <div className="flex flex-wrap gap-1.5 p-1 bg-slate-200/50 rounded-full">
+                                {(mode === 'years' ? [YearGroup.YEAR_7, YearGroup.YEAR_8, YearGroup.YEAR_9] : Object.values(Subject)).map(opt => (
+                                    <button 
+                                        key={opt} 
+                                        onClick={() => setSelectedSubTab(opt)}
+                                        className={`px-4 py-2 rounded-full text-[11px] font-black transition-all ${selectedSubTab === opt ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                                    >
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+                            <input 
+                                type="text" 
+                                placeholder="Search resources..." 
+                                className="flex-1 px-4 py-2 rounded-2xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Content Section */}
+                    <section>
+                        <h3 className="text-xl font-black text-slate-800 mb-6">Resources for {selectedSubTab}</h3>
+                        <ResourceGrid resources={filtered} onResourceClick={(res) => window.open(res.link, '_blank')} />
+                        {filtered.length === 0 && (
+                            <div className="text-center py-20 border-2 border-dashed border-slate-200 rounded-[2rem]">
+                                <p className="text-slate-400 font-bold uppercase text-xs">No resources found for this section.</p>
+                            </div>
+                        )}
+                    </section>
                 </div>
             );
         };
 
-        // --- MAIN APP COMPONENT ---
+        // --- MAIN APP ---
         const App = () => {
             const [resources, setResources] = useState([]);
-            const [mode, setMode] = useState('ib');
+            const [mode, setMode] = useState('years');
 
             useEffect(() => {
                 const q = query(collection(db, "resources"));
-                const unsub = onSnapshot(q, (snapshot) => {
-                    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setResources(docs);
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    setResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 });
-                return () => unsub();
+                return () => unsubscribe();
             }, []);
 
             return (
-                <div className="min-h-screen">
+                <div className="max-w-7xl mx-auto px-6">
+                    <header className="py-8 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
+                                <i className="fa-solid fa-graduation-cap"></i>
+                            </div>
+                            <h1 className="text-2xl font-black text-slate-800">YCYW HUMANITIES</h1>
+                        </div>
+                        <nav className="flex gap-2">
+                            {['years', 'igcse', 'ib'].map(m => (
+                                <button key={m} onClick={() => setMode(m)} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${mode === m ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-100'}`}>
+                                    {m}
+                                </button>
+                            ))}
+                        </nav>
+                    </header>
                     <YearGroupView resources={resources} mode={mode} />
                 </div>
             );
