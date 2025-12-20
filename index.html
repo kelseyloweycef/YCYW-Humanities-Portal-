@@ -44,63 +44,142 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
+        const StandardsView = ({ activeTab, subTab, isAdmin, userData }) => {
+            const [message, setMessage] = useState('');
+            
+            const factions = [
+                { name: "Past and Present", icon: "fa-history", color: "text-amber-500", bg: "bg-amber-50", topics: ["The Silk Road", "Dynastic Shifts", "Renaissance Impact"] },
+                { name: "Our Evolving World", icon: "fa-earth-asia", color: "text-emerald-500", bg: "bg-emerald-50", topics: ["Climate Migration", "Tectonic Hazards", "Urban Development"] },
+                { name: "Global Citizenship", icon: "fa-users-rays", color: "text-blue-500", bg: "bg-blue-50", topics: ["Human Rights", "Sustainable Development", "Digital Identity"] },
+                { name: "Economics & Business", icon: "fa-chart-pie", color: "text-indigo-500", bg: "bg-indigo-50", topics: ["Market Structures", "Entrepreneurship", "Global Supply Chains"] }
+            ];
+
+            const handleSendToAdmins = async () => {
+                if(!message) return;
+                await window.FB.addDoc(window.FB.collection(window.FB.db, "messages"), {
+                    from: userData.email,
+                    content: message,
+                    subject: `${activeTab} - ${subTab}`,
+                    timestamp: window.FB.serverTimestamp()
+                });
+                alert("Message sent to all Curriculum Officers!");
+                setMessage('');
+            };
+
+            const isSenior = ['igcse', 'ib', 'a-level', 'dse'].includes(activeTab);
+
+            return (
+                <div className="space-y-12 animate-in pb-20">
+                    {isSenior ? (
+                        <div className="space-y-8">
+                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
+                                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Official Exam Board Curriculum</h3>
+                                <div className="p-8 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex items-center justify-center text-slate-400 font-bold text-xs uppercase cursor-pointer hover:bg-slate-100 transition-all">
+                                    <i className="fa-solid fa-file-pdf mr-3 text-lg"></i> Access Official Specifications
+                                </div>
+                            </section>
+                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-4">Schemes of Work</h3>
+                                <button className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">Upload Shared SOW</button>
+                            </section>
+                        </div>
+                    ) : (
+                        <div className="space-y-12">
+                            {/* Goals Section */}
+                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
+                                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-6">End of Year Goals</h3>
+                                <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {["Understand chronological continuity through case studies.", "Analyze environmental shifts and human impact.", "Demonstrate global awareness through citizenship projects.", "Apply economic logic to local business models."].map(goal => (
+                                        <li key={goal} className="flex items-center gap-4 text-sm font-semibold text-slate-700 bg-slate-50 p-4 rounded-2xl">
+                                            <i className="fa-solid fa-check-circle text-indigo-500"></i>
+                                            {goal}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
+
+                            {/* Factions Section - Split Layout */}
+                            <div className="space-y-8">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] text-center mb-4">Curriculum Strands</h4>
+                                {factions.map(f => (
+                                    <div key={f.name} className="flex flex-col xl:flex-row gap-6 items-stretch">
+                                        {/* Left Side: Standards */}
+                                        <div className="flex-1 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex items-center gap-6">
+                                            <div className={`${f.bg} ${f.color} w-16 h-16 rounded-full flex items-center justify-center text-2xl shrink-0 shadow-inner`}><i className={`fa-solid ${f.icon}`}></i></div>
+                                            <div>
+                                                <h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Pedagogical Standards</p>
+                                                <p className="text-sm text-slate-500 font-medium leading-relaxed">Teachers must facilitate inquiry-based learning that connects the {f.name} strand to YCYW global values.</p>
+                                            </div>
+                                        </div>
+                                        {/* Right Side: Topics */}
+                                        <div className="w-full xl:w-80 bg-indigo-900 p-8 rounded-[3rem] text-white flex flex-col justify-center">
+                                            <p className="text-[9px] font-black text-indigo-300 uppercase tracking-widest mb-4">Example Topics</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {f.topics.map(t => <span key={t} className="px-3 py-1.5 bg-white/10 rounded-xl text-[10px] font-bold border border-white/10">{t}</span>)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Ask Curriculum Officer */}
+                    <section className="bg-slate-900 p-12 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 text-7xl opacity-10"><i className="fa-solid fa-paper-plane"></i></div>
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4">Ask the Curriculum Officer</h4>
+                        <textarea value={message} onChange={e => setMessage(e.target.value)} className="w-full bg-slate-800 p-6 rounded-3xl border-none text-sm text-white outline-none mb-4 min-h-[120px]" placeholder="Type your question here... all admins will be notified." />
+                        <button onClick={handleSendToAdmins} className="px-10 py-4 bg-white text-indigo-900 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-indigo-50 transition-all">Send Message</button>
+                    </section>
+                </div>
+            );
+        };
+
         const Dashboard = ({ userData, isSubscribed }) => (
-            <div className="space-y-8 animate-in">
-                {/* Hero Section */}
-                <div className="mesh-bg rounded-[3rem] p-16 text-white shadow-2xl relative">
+            <div className="space-y-8 animate-in pb-20">
+                <div className="mesh-bg rounded-[4rem] p-16 text-white shadow-2xl relative">
                     <div className="mesh-circle"></div>
                     <h1 className="text-5xl font-black relative z-10 tracking-tighter leading-none">Welcome to YCYW Humanities Portal</h1>
                     <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-[0.5em]">Global Excellence Network</p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column: Notifications & Feed */}
                     <div className="lg:col-span-2 space-y-8">
                         <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
                             <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Your Notified Subjects</h3>
                             {isSubscribed ? (
                                 <div className="space-y-4">
-                                    <div className="p-4 bg-slate-50 rounded-2xl border-l-4 border-emerald-500">
-                                        <p className="text-xs font-bold text-slate-800">New Resource Added: IGCSE Geography Case Study</p>
-                                        <p className="text-[10px] text-slate-400 mt-1">Updated 2 hours ago</p>
+                                    <div className="p-5 bg-emerald-50 rounded-2xl border-l-4 border-emerald-500 flex justify-between items-center">
+                                        <p className="text-xs font-bold text-slate-800">New Resource Added: Year 8 Historical Inquiry PPT</p>
+                                        <span className="text-[9px] font-black text-emerald-600 bg-white px-3 py-1 rounded-full uppercase">Just Now</span>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="py-10 text-center border-2 border-dashed rounded-3xl text-slate-300 font-bold text-xs uppercase tracking-widest">
-                                    Subscribe to a year group to see updates here
+                                <div className="py-16 text-center border-2 border-dashed rounded-[2.5rem] text-slate-300 font-bold text-xs uppercase tracking-[0.3em]">
+                                    No active subscriptions
                                 </div>
                             )}
                         </section>
 
                         <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
                             <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Foundation Newsfeed</h3>
-                            <div className="space-y-6">
-                                <div className="flex gap-4 items-start">
-                                    <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-500 shrink-0"><i className="fa-solid fa-trophy"></i></div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-800">Shanghai Campus Celebration</p>
-                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">Congratulations to the History department for the highest IGCSE scores in the region!</p>
-                                    </div>
-                                </div>
+                            <div className="p-6 bg-slate-50 rounded-2xl">
+                                <p className="text-sm font-bold text-slate-800">Humanities Symposium 2025</p>
+                                <p className="text-xs text-slate-500 mt-2">Registration is now open for our annual curriculum alignment meeting.</p>
                             </div>
                         </section>
                     </div>
 
-                    {/* Right Column: PD */}
                     <div className="space-y-8">
                         <section className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl">
                             <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Upcoming PD Opportunities</h3>
                             <div className="space-y-6">
-                                <div className="border-l-2 border-indigo-500 pl-4">
-                                    <p className="text-xs font-black text-indigo-300 uppercase">Jan 15</p>
-                                    <p className="text-sm font-bold mt-1">IB Philosophy Moderation Workshop</p>
-                                </div>
-                                <div className="border-l-2 border-slate-700 pl-4">
-                                    <p className="text-xs font-black text-slate-500 uppercase">Feb 02</p>
-                                    <p className="text-sm font-bold mt-1">AI in Lower Secondary Humanities</p>
+                                <div className="border-l-2 border-indigo-500 pl-4 py-1">
+                                    <p className="text-xs font-black text-indigo-400">Jan 22</p>
+                                    <p className="text-sm font-bold mt-1 tracking-tight">Concept-Based Learning Workshop</p>
                                 </div>
                             </div>
-                            <button className="w-full mt-8 py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all">View PD Calendar</button>
                         </section>
                     </div>
                 </div>
@@ -141,9 +220,8 @@
 
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden">
-                    {/* Sidebar */}
                     <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl custom-scrollbar overflow-y-auto">
-                        <div className="p-8 font-black text-sm uppercase text-indigo-400">YCYW Humanities</div>
+                        <div className="p-8 font-black text-sm uppercase text-indigo-400 tracking-tighter">YCYW Humanities</div>
                         <nav className="flex-1 px-4 space-y-1">
                             {navConfig.map(item => {
                                 if (item.adminOnly && userData?.role !== 'ADMIN') return null;
@@ -151,7 +229,7 @@
                                 return (
                                     <div key={item.id}>
                                         <button onClick={() => item.subs ? setExpanded(isExpanded ? null : item.id) : (setActiveTab(item.id), setSubTab(null))}
-                                            className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === item.id && !subTab ? 'bg-indigo-600' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                            className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest ${activeTab === item.id && !subTab ? 'bg-indigo-600' : 'text-slate-400 hover:bg-slate-800'}`}>
                                             <div className="flex items-center gap-3"><i className={`fa-solid ${item.icon} w-4`}></i>{item.label}</div>
                                             {item.subs && <i className={`fa-solid fa-chevron-down opacity-30 ${isExpanded ? 'rotate-180' : ''}`}></i>}
                                         </button>
@@ -169,11 +247,10 @@
                                 );
                             })}
                         </nav>
-                        <div className="p-4 border-t border-slate-800"><button onClick={() => window.FB.signOut(window.FB.auth)} className="w-full p-4 bg-slate-800 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:text-red-400 transition-colors">Logout</button></div>
+                        <div className="p-4 border-t border-slate-800"><button onClick={() => window.FB.signOut(window.FB.auth)} className="w-full p-4 bg-slate-800 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:text-red-400">Logout</button></div>
                     </div>
 
                     <div className="flex-1 flex flex-col overflow-hidden">
-                        {/* Header */}
                         <header className="h-24 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm">
                             <div className="flex items-center gap-6">
                                 <div>
@@ -188,18 +265,15 @@
                             </div>
                             
                             <div className="flex items-center gap-6">
-                                {/* Navigation Toggles - HIDDEN on Dashboard */}
                                 {subTab && (
                                     <div className="bg-slate-100 p-1 rounded-2xl flex gap-1 shadow-inner">
                                         <button onClick={() => setViewMode('standards')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'standards' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Standards</button>
                                         <button onClick={() => setViewMode('library')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'library' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Library</button>
                                     </div>
                                 )}
-                                
                                 <button className="relative flex items-center gap-3 px-4 py-3 bg-slate-100 rounded-xl group hover:bg-indigo-50 transition-all shadow-sm">
                                     <i className="fa-solid fa-inbox text-slate-400 group-hover:text-indigo-600"></i>
                                     <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-indigo-600">Inbox</span>
-                                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[8px] flex items-center justify-center rounded-full border-2 border-white shadow-sm">0</span>
                                 </button>
                                 <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs uppercase shadow-lg shadow-indigo-100">{userData?.name?.[0] || 'U'}</div>
                             </div>
@@ -209,12 +283,7 @@
                             {activeTab === 'dashboard' ? (
                                 <Dashboard userData={userData} isSubscribed={isSubscribed} />
                             ) : subTab ? (
-                                <div>
-                                    {/* Standards / Library content goes here */}
-                                    <div className="text-center py-40 border-2 border-dashed border-slate-200 rounded-[4rem] text-slate-300 font-black uppercase text-[10px] tracking-[0.5em] animate-in">
-                                        {viewMode.toUpperCase()} for {subTab} Content Coming Soon
-                                    </div>
-                                </div>
+                                <StandardsView activeTab={activeTab} subTab={subTab} isAdmin={userData?.role === 'ADMIN'} userData={userData} />
                             ) : (
                                 <div className="text-center py-40 text-slate-300 font-black uppercase text-[10px] tracking-[0.5em]">
                                     Select a year group to begin
