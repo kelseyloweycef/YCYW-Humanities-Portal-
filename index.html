@@ -1,31 +1,283 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YCYW Humanities</title>
+    <title>YCYW Humanities Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; overflow: hidden; }
+        .font-black { font-weight: 900; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
-  }
-}
-</script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom": "https://esm.sh/react-dom@18.2.0/client",
+        "firebase/app": "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js"
+      }
+    }
+    </script>
 </head>
 <body>
     <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useMemo } from "react";
+        import { createRoot } from "react-dom";
+        import { initializeApp } from "firebase/app";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, updateDoc, query, where, orderBy, addDoc, serverTimestamp, arrayUnion } from "firebase/firestore";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
+          authDomain: "ycyw-humanities-portal.firebaseapp.com",
+          projectId: "ycyw-humanities-portal",
+          storageBucket: "ycyw-humanities-portal.firebasestorage.app",
+          messagingSenderId: "141054228326",
+          appId: "1:141054228326:web:13248804cf5e407a163aa7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const SUBJECTS = ["History", "Geography", "Business", "Economics", "Psychology", "Sociology", "Enterprise", "Philosophy", "General Humanities"];
+
+        // --- COMPONENT: FORUM ---
+        const Forum = ({ posts, currentUser, contextYear, contextSubject }) => {
+            const [newTitle, setNewTitle] = useState('');
+            const [newContent, setNewContent] = useState('');
+            const [isPosting, setIsPosting] = useState(false);
+
+            const handlePostSubmit = async (e) => {
+                e.preventDefault();
+                await addDoc(collection(db, "forum"), {
+                    title: newTitle,
+                    content: newContent,
+                    author: currentUser.name,
+                    date: new Date().toISOString().split('T')[0],
+                    yearGroup: contextYear || null,
+                    subject: contextSubject || null,
+                    replies: [],
+                    createdAt: serverTimestamp()
+                });
+                setNewTitle(''); setNewContent(''); setIsPosting(false);
+            };
+
+            const handleReply = async (postId, content) => {
+                const postRef = doc(db, "forum", postId);
+                await updateDoc(postRef, {
+                    replies: arrayUnion({
+                        id: Math.random().toString(36).substr(2, 9),
+                        author: currentUser.name,
+                        content: content,
+                        date: 'Just now'
+                    })
+                });
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto space-y-8 animate-in pb-20">
+                    <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-black mb-1">
+                                {contextYear ? `${contextYear} Discussion` : contextSubject ? `${contextSubject} Discussion` : 'Staff Discussions'}
+                            </h2>
+                            <p className="text-xs opacity-80 uppercase font-bold tracking-widest">Collaborate with the team.</p>
+                        </div>
+                        <button onClick={() => setIsPosting(true)} className="bg-white text-indigo-600 px-6 py-2 rounded-xl font-bold text-sm shadow-md">New Topic</button>
+                    </div>
+
+                    {isPosting && (
+                        <form onSubmit={handlePostSubmit} className="bg-white p-6 rounded-3xl border border-indigo-100 shadow-xl space-y-4">
+                            <input className="w-full p-4 bg-slate-50 rounded-2xl border outline-none font-bold" placeholder="Topic Title" value={newTitle} onChange={e => setNewTitle(e.target.value)} required />
+                            <textarea className="w-full p-4 bg-slate-50 rounded-2xl border h-32 outline-none" placeholder="Description..." value={newContent} onChange={e => setNewContent(e.target.value)} required />
+                            <div className="flex justify-end gap-2">
+                                <button type="button" onClick={() => setIsPosting(false)} className="px-4 text-slate-400 font-bold">Cancel</button>
+                                <button type="submit" className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg">Post Topic</button>
+                            </div>
+                        </form>
+                    )}
+
+                    <div className="space-y-6">
+                        {posts.map(post => (
+                            <div key={post.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 bg-indigo-50 text-indigo-400 rounded-full flex items-center justify-center font-bold text-xs">{post.author[0]}</div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">{post.author}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">{post.date}</p>
+                                    </div>
+                                </div>
+                                <h3 className="text-xl font-black text-slate-800 mb-2 leading-tight">{post.title}</h3>
+                                <p className="text-slate-600 mb-8 text-sm">{post.content}</p>
+                                
+                                <div className="space-y-4 border-t pt-6">
+                                    {post.replies?.map((reply, i) => (
+                                        <div key={i} className="bg-slate-50 p-4 rounded-2xl ml-8 border-l-4 border-indigo-500">
+                                            <p className="text-xs font-black text-slate-800 mb-1">{reply.author}</p>
+                                            <p className="text-sm text-slate-600">{reply.content}</p>
+                                        </div>
+                                    ))}
+                                    <form className="flex gap-2 ml-8 pt-4" onSubmit={(e) => { e.preventDefault(); handleReply(post.id, e.target.reply.value); e.target.reply.value = ''; }}>
+                                        <input name="reply" placeholder="Write a response..." className="flex-1 text-sm bg-slate-50 border rounded-2xl px-4 py-2 outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                        <button className="bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold">Reply</button>
+                                    </form>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MASTER APP ---
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [userData, setUserData] = useState(null);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [view, setView] = useState('resources'); // 'resources' or 'discussion'
+            const [resources, setResources] = useState([]);
+            const [forumPosts, setForumPosts] = useState([]);
+            const [schoolLogo, setSchoolLogo] = useState(null);
+            const [pendingUsers, setPendingUsers] = useState([]);
+            const [authMode, setAuthMode] = useState('login');
+
+            useEffect(() => {
+                onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        const d = await getDoc(doc(db, "users", u.uid));
+                        if (d.exists()) { setUserData(d.data()); setUser(u); }
+                    } else { setUser(null); setUserData(null); }
+                });
+            }, []);
+
+            useEffect(() => {
+                onSnapshot(doc(db, "settings", "branding"), (d) => { if (d.exists()) setSchoolLogo(d.data().logoUrl); });
+                onSnapshot(query(collection(db, "resources"), orderBy("createdAt", "desc")), (s) => setResources(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                onSnapshot(query(collection(db, "forum"), orderBy("createdAt", "desc")), (s) => setForumPosts(s.docs.map(d => ({id: d.id, ...d.data()}))));
+            }, []);
+
+            useEffect(() => {
+                if (userData?.role === 'ADMIN') {
+                    const q = query(collection(db, "users"), where("isApproved", "==", false));
+                    onSnapshot(q, (s) => setPendingUsers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+                }
+            }, [userData]);
+
+            const handleAuth = async (e) => {
+                e.preventDefault();
+                try {
+                    if (authMode === 'signup') {
+                        const { user: newUser } = await createUserWithEmailAndPassword(auth, e.target.email.value, e.target.password.value);
+                        const isKelsey = e.target.email.value.toLowerCase() === 'kelsey.lowe@hk.ycef.com';
+                        await setDoc(doc(db, "users", newUser.uid), {
+                            uid: newUser.uid, name: e.target.fullname.value, email: e.target.email.value,
+                            school: e.target.school.value, subjects: Array.from(e.target.subjects.selectedOptions).map(o => o.value),
+                            role: isKelsey ? 'ADMIN' : 'STAFF', isApproved: isKelsey
+                        });
+                    } else {
+                        await signInWithEmailAndPassword(auth, e.target.email.value, e.target.password.value);
+                    }
+                } catch (err) { alert(err.message); }
+            };
+
+            const SidebarItem = ({ id, label, icon, adminOnly = false }) => {
+                if (adminOnly && userData?.role !== 'ADMIN') return null;
+                return (
+                    <button onClick={() => {setActiveTab(id); setView('resources');}} className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${activeTab === id ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-400 hover:bg-slate-800'}`}>
+                        <i className={`fa-solid ${icon} w-6 text-center`}></i>
+                        <span className="hidden md:block font-bold text-sm tracking-wide">{label}</span>
+                    </button>
+                );
+            };
+
+            if (!user) return (
+                <div className="h-screen flex items-center justify-center bg-slate-900 p-6">
+                    <div className="glass p-10 rounded-[3rem] w-full max-w-md animate-in">
+                        <h2 className="text-3xl font-black text-slate-800 mb-6">YCYW Portal</h2>
+                        <form onSubmit={handleAuth} className="space-y-4">
+                            {authMode === 'signup' && (
+                                <><input name="fullname" placeholder="Name" className="w-full p-4 rounded-2xl border" required />
+                                <input name="school" placeholder="School" className="w-full p-4 rounded-2xl border" required />
+                                <select name="subjects" multiple className="w-full p-4 rounded-2xl border h-24 text-xs" required>{SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}</select></>
+                            )}
+                            <input name="email" type="email" placeholder="Email" className="w-full p-4 rounded-2xl border" required />
+                            <input name="password" type="password" placeholder="Password" className="w-full p-4 rounded-2xl border" required />
+                            <button className="w-full bg-indigo-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest">{authMode === 'login' ? 'Login' : 'Sign Up'}</button>
+                        </form>
+                        <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="w-full mt-6 text-xs font-black text-slate-400 uppercase underline">Switch to {authMode === 'login' ? 'Sign Up' : 'Login'}</button>
+                    </div>
+                </div>
+            );
+
+            if (!userData?.isApproved) return <div className="h-screen flex flex-col items-center justify-center text-center p-10"><h2 className="text-2xl font-black mb-4">Pending Approval</h2><button onClick={() => signOut(auth)} className="text-indigo-600 font-bold underline">Logout</button></div>;
+
+            return (
+                <div className="flex h-screen bg-slate-50">
+                    <div className="w-20 md:w-64 bg-slate-900 text-white flex flex-col transition-all h-screen shrink-0">
+                        <div className="p-6 flex items-center gap-3">
+                            <div onClick={() => {if(userData.role === 'ADMIN') { const url = prompt("Enter new Logo URL:"); if(url) setDoc(doc(db, "settings", "branding"), {logoUrl: url}); }}} className={`cursor-pointer flex items-center justify-center rounded-xl ${schoolLogo ? 'bg-white w-12 h-12 p-1' : 'bg-indigo-500 w-12 h-12'}`}>{schoolLogo ? <img src={schoolLogo} className="w-full h-full object-contain" /> : <i className="fa-solid fa-graduation-cap"></i>}</div>
+                            <span className="hidden md:block font-black text-xs text-indigo-100 uppercase tracking-tighter">YCYW Humanities</span>
+                        </div>
+                        <nav className="flex-1 px-3 space-y-1.5 mt-4">
+                            <SidebarItem id="dashboard" label="Dashboard" icon="fa-gauge" />
+                            <SidebarItem id="years-7-9" label="Years 7 - 9" icon="fa-seedling" />
+                            <SidebarItem id="igcse" label="IGCSE" icon="fa-book-bookmark" />
+                            <SidebarItem id="ib" label="IB / A-Level" icon="fa-graduation-cap" />
+                            <SidebarItem id="admin" label="Admin Hub" icon="fa-shield-halved" adminOnly />
+                        </nav>
+                        <div className="p-4 mt-auto"><button onClick={() => signOut(auth)} className="w-full flex items-center justify-center p-3 bg-slate-800 rounded-2xl text-slate-400 hover:text-red-500"><i className="fa-solid fa-power-off"></i></button></div>
+                    </div>
+                    
+                    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                        <header className="h-20 bg-white border-b flex items-center justify-between px-8">
+                            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{activeTab.replace('-', ' ')}</h2>
+                            <div className="flex gap-2">
+                                <button onClick={() => setView('resources')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase ${view === 'resources' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>Resources</button>
+                                <button onClick={() => setView('discussion')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase ${view === 'discussion' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>Discussion</button>
+                            </div>
+                        </header>
+                        <main className="flex-1 overflow-y-auto p-8">
+                            {activeTab === 'admin' ? (
+                                <div className="space-y-6 max-w-4xl">
+                                    <h3 className="text-2xl font-black">Staff Approvals</h3>
+                                    {pendingUsers.map(u => (
+                                        <div key={u.id} className="bg-white p-6 rounded-3xl border flex justify-between items-center">
+                                            <div><p className="font-black">{u.name}</p><p className="text-xs text-slate-400">{u.school} • {u.subjects.join(", ")}</p></div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => updateDoc(doc(db, "users", u.id), {isApproved: true, role: 'STAFF'})} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Teacher</button>
+                                                <button onClick={() => updateDoc(doc(db, "users", u.id), {isApproved: true, role: 'ADMIN'})} className="bg-amber-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Admin</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : view === 'discussion' ? (
+                                <Forum posts={forumPosts.filter(p => activeTab === 'dashboard' || p.yearGroup === activeTab || p.subject === activeTab)} currentUser={userData} contextYear={activeTab} />
+                            ) : (
+                                <div className="text-center py-40 border-2 border-dashed border-slate-200 rounded-[3rem]">
+                                    <p className="text-slate-400 font-black uppercase text-xs tracking-widest">Resource Cards for {activeTab} go here.</p>
+                                </div>
+                            )}
+                        </main>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
