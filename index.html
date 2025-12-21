@@ -44,186 +44,178 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- SHARED RESOURCES COMPONENT ---
+        // --- SUB-COMPONENT: POPUP MODAL FOR DEFINITIONS ---
+        const DefinitionModal = ({ item, onClose, isAdmin }) => {
+            const [isEditing, setIsEditing] = useState(false);
+            const [content, setContent] = useState({ desc: "Loading...", example: "Loading..." });
+            const docId = `def_${item.name}`.replace(/\s+/g, '_');
+
+            useEffect(() => {
+                const unsub = window.FB.onSnapshot(window.FB.doc(window.FB.db, "definitions", docId), (doc) => {
+                    if (doc.exists()) setContent(doc.data());
+                    else setContent({ desc: "Standard definition not yet set.", example: "No example provided." });
+                });
+                return () => unsub();
+            }, [docId]);
+
+            const handleSave = async () => {
+                await window.FB.setDoc(window.FB.doc(window.FB.db, "definitions", docId), content);
+                setIsEditing(false);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6" onClick={onClose}>
+                    <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl animate-in" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-2xl font-black text-slate-800 mb-6">{item.name}</h3>
+                        <div className="space-y-6">
+                            <div className="bg-slate-50 p-6 rounded-3xl">
+                                <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Descriptor</p>
+                                {isEditing ? <textarea className="w-full p-3 text-sm border rounded-xl" value={content.desc} onChange={e => setContent({...content, desc: e.target.value})} /> : <p className="text-sm text-slate-600 font-medium">{content.desc}</p>}
+                            </div>
+                            <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100">
+                                <p className="text-[9px] font-black text-indigo-400 uppercase mb-2">Example</p>
+                                {isEditing ? <textarea className="w-full p-3 text-sm border rounded-xl" value={content.example} onChange={e => setContent({...content, example: e.target.value})} /> : <p className="text-sm italic text-indigo-900 font-medium">"{content.example}"</p>}
+                            </div>
+                        </div>
+                        {isAdmin && (
+                            <button onClick={() => isEditing ? handleSave() : setIsEditing(true)} className="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs">
+                                {isEditing ? "Save Changes" : "Edit Standard"}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SUB-COMPONENT: SHARED RESOURCES ---
         const SharedResources = ({ activeTab, subTab, userData }) => {
             const [resources, setResources] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
-            const [commentingOn, setCommentingOn] = useState(null);
-            const [newResource, setNewResource] = useState({ title: '', links: '', strands: [] });
+            const [newRes, setNewRes] = useState({ title: '', links: '', strands: [] });
+            const [selectedRes, setSelectedRes] = useState(null);
 
-            const collectionPath = `resources_${activeTab}_${subTab}`.replace(/\s+/g, '_');
+            const strands = ["Past and Present", "Our Evolving World", "Global Citizenship", "Economics & Business"];
             const isJunior = ['primary', 'lower-secondary'].includes(activeTab);
-
-            const strandOptions = [
-                { name: "Past and Present", icon: "fa-history", color: "bg-amber-500" },
-                { name: "Our Evolving World", icon: "fa-earth-asia", color: "bg-emerald-500" },
-                { name: "Global Citizenship", icon: "fa-users-rays", color: "bg-blue-500" },
-                { name: "Economics & Business", icon: "fa-chart-pie", color: "bg-indigo-500" }
-            ];
+            const dbKey = `resources_${activeTab}_${subTab}`.replace(/\s+/g, '_');
 
             useEffect(() => {
-                const q = window.FB.query(window.FB.collection(window.FB.db, collectionPath), window.FB.orderBy("timestamp", "desc"));
+                const q = window.FB.query(window.FB.collection(window.FB.db, dbKey), window.FB.orderBy("timestamp", "desc"));
                 return window.FB.onSnapshot(q, (s) => setResources(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-            }, [collectionPath]);
+            }, [dbKey]);
 
-            const toggleStrand = (strandName) => {
-                setNewResource(prev => ({
-                    ...prev,
-                    strands: prev.strands.includes(strandName) 
-                        ? prev.strands.filter(s => s !== strandName) 
-                        : [...prev.strands, strandName]
-                }));
-            };
-
-            const handleUpload = async (e) => {
-                e.preventDefault();
-                if (!newResource.title) return;
-                await window.FB.addDoc(window.FB.collection(window.FB.db, collectionPath), {
-                    title: newResource.title,
-                    links: newResource.links.split(',').map(l => l.trim()).filter(l => l !== ""),
-                    strands: newResource.strands,
-                    author: userData.name,
-                    authorEmail: userData.email,
-                    timestamp: window.FB.serverTimestamp()
+            const handleUpload = async () => {
+                if(!newRes.title) return;
+                await window.FB.addDoc(window.FB.collection(window.FB.db, dbKey), {
+                    ...newRes, author: userData.name, timestamp: window.FB.serverTimestamp(), links: newRes.links.split(',')
                 });
-                setNewResource({ title: '', links: '', strands: [] });
                 setIsUploading(false);
+                setNewRes({ title: '', links: '', strands: [] });
             };
 
             return (
                 <div className="space-y-8 animate-in pb-20">
                     <div className="flex justify-between items-center">
-                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Shared Materials</h3>
-                        <button onClick={() => setIsUploading(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">
-                            <i className="fa-solid fa-plus mr-2"></i> Add New Resource
-                        </button>
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Shared Resources</h3>
+                        <button onClick={() => setIsUploading(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest">Add New Resource</button>
                     </div>
 
                     {isUploading && (
-                        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-100 shadow-xl animate-in">
-                            <form onSubmit={handleUpload} className="space-y-6">
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Resource Info</p>
-                                    <input placeholder="Resource Title" className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-500 font-bold mb-3" 
-                                        onChange={e => setNewResource({...newResource, title: e.target.value})} required />
-                                    <textarea placeholder="Paste links (comma separated)" className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-500 text-sm h-24" 
-                                        onChange={e => setNewResource({...newResource, links: e.target.value})} />
+                        <div className="bg-white p-10 rounded-[3rem] border-2 border-indigo-100 shadow-xl space-y-4">
+                            <input placeholder="Title" className="w-full p-4 bg-slate-50 rounded-2xl font-bold" onChange={e => setNewRes({...newRes, title: e.target.value})} />
+                            <textarea placeholder="Links (comma separated)" className="w-full p-4 bg-slate-50 rounded-2xl text-sm" onChange={e => setNewRes({...newRes, links: e.target.value})} />
+                            {isJunior && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    {strands.map(s => (
+                                        <label key={s} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl text-[9px] font-black uppercase">
+                                            <input type="checkbox" onChange={() => setNewRes({...newRes, strands: newRes.strands.includes(s) ? newRes.strands.filter(x => x !== s) : [...newRes.strands, s]})} /> {s}
+                                        </label>
+                                    ))}
                                 </div>
-
-                                {isJunior && (
-                                    <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest ml-1">Curriculum Strand Links (Select all that apply)</p>
-                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                            {strandOptions.map(s => (
-                                                <button key={s.name} type="button" onClick={() => toggleStrand(s.name)}
-                                                    className={`p-4 rounded-2xl text-[9px] font-black uppercase text-left transition-all border-2 ${newResource.strands.includes(s.name) ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-100 bg-slate-50 text-slate-400'}`}>
-                                                    <i className={`fa-solid ${s.icon} mb-2 block text-sm`}></i>
-                                                    {s.name}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="flex gap-2 pt-4">
-                                    <button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-indigo-100">Upload to Global Portal</button>
-                                    <button type="button" onClick={() => setIsUploading(false)} className="px-8 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-xs">Cancel</button>
-                                </div>
-                            </form>
+                            )}
+                            <div className="flex gap-2">
+                                <button onClick={handleUpload} className="flex-1 bg-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs">Upload</button>
+                                <button onClick={() => setIsUploading(false)} className="px-8 bg-slate-100 rounded-xl font-black uppercase text-xs">Cancel</button>
+                            </div>
                         </div>
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {resources.map(res => (
-                            <div key={res.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm hover:border-indigo-300 transition-all group">
-                                <div className="flex justify-between items-start mb-4">
-                                    <h4 className="text-lg font-black text-slate-800 leading-tight pr-4">{res.title}</h4>
-                                    <div className="text-right">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase">Uploaded by</p>
-                                        <p className="text-[10px] font-black text-indigo-600 uppercase">{res.author.split(' ')[0]}</p>
-                                    </div>
+                            <div key={res.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm group">
+                                <h4 className="text-lg font-black text-slate-800 mb-4">{res.title}</h4>
+                                <div className="flex flex-wrap gap-2 mb-6">
+                                    {res.strands?.map(s => <span key={s} className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase rounded-full">{s}</span>)}
                                 </div>
-                                
-                                {res.strands && res.strands.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mb-6">
-                                        {res.strands.map(sName => {
-                                            const strand = strandOptions.find(opt => opt.name === sName);
-                                            return (
-                                                <span key={sName} className={`${strand?.color} text-white px-3 py-1 rounded-full text-[8px] font-black uppercase flex items-center gap-1 shadow-sm`}>
-                                                    <i className={`fa-solid ${strand?.icon}`}></i> {sName}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                <div className="space-y-2 mb-6">
-                                    {res.links.map((link, i) => link && (
-                                        <a key={i} href={link} target="_blank" className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-100">
-                                            <i className="fa-solid fa-arrow-up-right-from-square opacity-40"></i> 
-                                            <span className="truncate">{link}</span>
-                                        </a>
-                                    ))}
-                                </div>
-
-                                <button onClick={() => setCommentingOn(res)} className="w-full flex items-center justify-center gap-2 py-3 bg-slate-100 hover:bg-indigo-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                                    <i className="fa-solid fa-comments"></i> Resource Discussion
-                                </button>
+                                <button onClick={() => setSelectedRes(res)} className="w-full py-3 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">Discussion & Files</button>
                             </div>
                         ))}
                     </div>
-
-                    {/* Discussion Modal */}
-                    {commentingOn && (
-                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6" onClick={() => setCommentingOn(null)}>
-                            <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl animate-in flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Discussion</h3>
-                                    <button onClick={() => setCommentingOn(null)}><i className="fa-solid fa-times text-slate-300"></i></button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                                    <div className="p-4 bg-slate-50 rounded-2xl text-[10px] font-bold text-slate-400 uppercase text-center border-2 border-dashed">No comments yet. Start the conversation!</div>
-                                </div>
-                                <div className="mt-6 flex gap-2">
-                                    <input placeholder="Post a comment or question..." className="flex-1 p-4 bg-slate-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-                                    <button className="bg-indigo-600 text-white px-6 rounded-xl"><i className="fa-solid fa-paper-plane"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         };
 
-        // --- (CurriculumView component same as previous) ---
+        // --- COMPONENT: CURRICULUM VIEW ---
         const CurriculumView = ({ activeTab, subTab, isAdmin, userData }) => {
+            const [selectedItem, setSelectedItem] = useState(null);
             const factions = [
                 { name: "Past and Present", icon: "fa-history", color: "text-amber-500", bg: "bg-amber-50", topics: ["Silk Road", "Heritage"] },
                 { name: "Our Evolving World", icon: "fa-earth-asia", color: "text-emerald-500", bg: "bg-emerald-50", topics: ["Climate", "Tectonics"] },
-                { name: "Global Citizenship", icon: "fa-users-rays", color: "text-blue-500", bg: "bg-blue-50", topics: ["Rights", "SDGs"] },
-                { name: "Economics & Business", icon: "fa-chart-pie", color: "text-indigo-500", bg: "bg-indigo-50", topics: ["Trade", "Finance"] }
+                { name: "Global Citizenship", icon: "fa-users-rays", color: "text-blue-500", bg: "bg-blue-50", topics: ["Human Rights", "SDGs"] },
+                { name: "Economics & Business", icon: "fa-chart-pie", color: "text-indigo-500", bg: "bg-indigo-50", topics: ["Trade Hubs", "Financials"] }
             ];
             const isSenior = ['igcse', 'ib', 'a-level', 'dse'].includes(activeTab);
+
             return (
                 <div className="space-y-12 animate-in pb-20">
+                    {selectedItem && <DefinitionModal item={selectedItem} isAdmin={isAdmin} onClose={() => setSelectedItem(null)} />}
                     {isSenior ? (
                         <div className="space-y-8">
-                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm"><h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Official Exam Board Curriculum</h3><div className="p-10 border-2 border-dashed border-slate-200 rounded-3xl text-center text-slate-400 font-bold text-xs uppercase cursor-pointer hover:bg-slate-50">Board Specifications</div></section>
-                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm"><div className="flex justify-between items-center mb-6"><h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Schemes of Work</h3><button className="bg-indigo-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase">Upload SOW</button></div></section>
+                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
+                                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Official Exam Board Curriculum</h3>
+                                <div className="p-10 border-2 border-dashed border-slate-200 rounded-3xl text-center text-slate-400 font-bold text-xs uppercase cursor-pointer hover:bg-slate-50">Specifications</div>
+                            </section>
+                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-6">Schemes of Work</h3>
+                                <button className="bg-indigo-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase">Upload SOW</button>
+                            </section>
                         </div>
                     ) : (
                         <div className="space-y-10">
-                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm"><h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-6">End of Year Goals</h3><ul className="list-disc pl-6 space-y-3 text-sm font-semibold text-slate-700"><li>Analyze continuity and change over time.</li><li>Evaluate environmental systems.</li><li>Demonstrate global citizenship.</li><li>Apply economic logic.</li></ul></section>
+                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
+                                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-6">End of Year Goals</h3>
+                                <ul className="list-disc pl-6 space-y-3 text-sm font-semibold text-slate-700">
+                                    <li>Analyze historical continuity and its impact on modern identity.</li>
+                                    <li>Evaluate geographical changes through thematic mapping.</li>
+                                    <li>Demonstrate civic responsibility through global citizenship projects.</li>
+                                    <li>Apply economic logic to local business models.</li>
+                                </ul>
+                            </section>
+                            <div className={`grid gap-6 ${activeTab === 'lower-secondary' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                                <div className="bg-indigo-50 p-8 rounded-[3rem] border border-indigo-100 text-center">
+                                    <h4 className="text-[10px] font-black text-indigo-600 uppercase mb-6 tracking-widest">Key Skills</h4>
+                                    <div className="flex flex-wrap gap-2 justify-center">
+                                        {["Analysis", "Evaluation", "Inquiry"].map(s => <button key={s} onClick={() => setSelectedItem({type:'Skill', name: s})} className="bg-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase text-slate-700 shadow-sm">{s}</button>)}
+                                    </div>
+                                </div>
+                                {activeTab === 'lower-secondary' && (
+                                    <div className="bg-slate-900 p-8 rounded-[3rem] text-center text-white">
+                                        <h4 className="text-[10px] font-black text-indigo-400 uppercase mb-6 tracking-widest">Key Command Terms</h4>
+                                        <div className="flex flex-wrap gap-2 justify-center">
+                                            {["Analyze", "Evaluate"].map(c => <button key={c} onClick={() => setSelectedItem({type:'Command Term', name: c})} className="bg-slate-800 px-5 py-3 rounded-2xl text-[10px] font-black uppercase text-white">{c}</button>)}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                             <div className="space-y-6">
                                 {factions.map(f => (
                                     <div key={f.name} className="flex flex-col lg:flex-row gap-6">
-                                        <div className="flex-1 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex items-center gap-6 cursor-pointer hover:border-indigo-400 transition-all">
+                                        <div onClick={() => setSelectedItem({type:'Strand', name: f.name})} className="flex-1 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex items-center gap-6 cursor-pointer hover:border-indigo-400 transition-all">
                                             <div className={`${f.bg} ${f.color} w-16 h-16 rounded-full flex items-center justify-center text-2xl shrink-0`}><i className={`fa-solid ${f.icon}`}></i></div>
-                                            <div><h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5><p className="text-sm text-slate-500 font-medium leading-relaxed">Network curriculum standards.</p></div>
+                                            <div><h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5><p className="text-sm text-slate-500 font-medium tracking-tight">Standard curriculum goal.</p></div>
                                         </div>
                                         <div className="w-full lg:w-72 bg-slate-900 p-8 rounded-[3rem] text-white flex flex-col justify-center">
-                                            <p className="text-[9px] font-black text-indigo-400 uppercase mb-4 tracking-widest">Example Topics</p>
-                                            <div className="flex flex-wrap gap-2">{f.topics.map(t => <span key={t} className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold border border-white/10">{t}</span>)}</div>
+                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-4">Example Topics</p>
+                                            <div className="flex flex-wrap gap-2">{f.topics.map(t => <span key={t} onClick={(e) => {e.stopPropagation(); setSelectedItem({type:'Topic', name: t})}} className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold border border-white/10 cursor-pointer hover:bg-white hover:text-slate-900">{t}</span>)}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -234,6 +226,7 @@
             );
         };
 
+        // --- COMPONENT: DASHBOARD ---
         const Dashboard = ({ userData, isSubscribed }) => (
             <div className="space-y-8 animate-in pb-20">
                 <div className="mesh-bg rounded-[4rem] p-16 text-white shadow-2xl relative">
@@ -245,7 +238,7 @@
                     <div className="lg:col-span-2 space-y-8">
                         <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
                             <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Your Notified Subjects</h3>
-                            {isSubscribed ? <div className="p-4 bg-emerald-50 text-emerald-700 rounded-2xl font-bold text-xs uppercase">Recent Updates</div> : <div className="py-10 text-center border-2 border-dashed rounded-3xl text-slate-300 font-bold text-xs uppercase">No active subscriptions</div>}
+                            {isSubscribed ? <div className="p-4 bg-emerald-50 text-emerald-700 rounded-2xl font-bold text-xs uppercase">New Updates Available</div> : <div className="py-10 text-center border-2 border-dashed rounded-3xl text-slate-300 font-bold text-xs uppercase">No active subscriptions</div>}
                         </section>
                         <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
                             <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Foundation Newsfeed</h3>
@@ -254,12 +247,13 @@
                     </div>
                     <section className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl">
                         <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Upcoming PD Opportunities</h3>
-                        <div className="border-l-2 border-indigo-500 pl-4 py-1 text-sm font-bold tracking-tight">Jan 22: Network Moderation Training</div>
+                        <div className="border-l-2 border-indigo-500 pl-4 py-1 text-sm font-bold tracking-tight">Jan 22: Network Training</div>
                     </section>
                 </div>
             </div>
         );
 
+        // --- MAIN APP ---
         const App = () => {
             const [user, setUser] = useState(null);
             const [userData, setUserData] = useState(null);
@@ -290,7 +284,7 @@
                 { id: 'admin', label: 'Admin Hub', icon: 'fa-shield-halved', adminOnly: true }
             ];
 
-            if (!user) return <div className="h-screen flex items-center justify-center bg-[#0f172a] text-white">Authenticating Portal...</div>;
+            if (!user) return <div className="h-screen flex items-center justify-center bg-[#0f172a] text-white">Connecting...</div>;
 
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -329,12 +323,7 @@
                             <div className="flex items-center gap-6">
                                 <div>
                                     <h2 className="font-black text-slate-800 uppercase text-lg leading-none tracking-tight">{subTab || activeTab.replace('-', ' ')}</h2>
-                                    {subTab && (
-                                        <button onClick={() => setIsSubscribed(!isSubscribed)} className={`mt-2 flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.2em] ${isSubscribed ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                            <i className={`fa-solid ${isSubscribed ? 'fa-bell' : 'fa-bell-slash'}`}></i>
-                                            {isSubscribed ? 'Subscribed' : 'Receive Notifications'}
-                                        </button>
-                                    )}
+                                    {subTab && <button onClick={() => setIsSubscribed(!isSubscribed)} className={`mt-2 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest ${isSubscribed ? 'text-emerald-500' : 'text-slate-400'}`}><i className={`fa-solid ${isSubscribed ? 'fa-bell' : 'fa-bell-slash'}`}></i>{isSubscribed ? 'Subscribed' : 'Notifications Off'}</button>}
                                 </div>
                             </div>
                             <div className="flex items-center gap-6">
@@ -344,11 +333,11 @@
                                         <button onClick={() => setViewMode('shared')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'shared' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Shared Resources</button>
                                     </div>
                                 )}
-                                <button className="relative flex items-center gap-3 px-4 py-3 bg-slate-100 rounded-xl group hover:bg-indigo-50 transition-all shadow-sm">
-                                    <i className="fa-solid fa-inbox text-slate-400 group-hover:text-indigo-600"></i>
-                                    <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-indigo-600">Inbox</span>
-                                </button>
-                                <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs uppercase shadow-lg shadow-indigo-100">{userData?.name?.[0] || 'U'}</div>
+                                <div className="flex items-center gap-3 px-4 py-3 bg-slate-100 rounded-xl">
+                                    <i className="fa-solid fa-inbox text-slate-400"></i>
+                                    <span className="text-[9px] font-black uppercase text-slate-400">Inbox</span>
+                                </div>
+                                <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs uppercase shadow-lg shadow-indigo-100">{userData?.name?.[0]}</div>
                             </div>
                         </header>
                         <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc]">
