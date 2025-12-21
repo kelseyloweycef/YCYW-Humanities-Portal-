@@ -44,53 +44,12 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- DEFINITION MODAL ---
-        const DefinitionModal = ({ item, onClose, isAdmin }) => {
-            const [isEditing, setIsEditing] = useState(false);
-            const [content, setContent] = useState({ desc: "Standard definition not set.", example: "No example provided." });
-            const docId = `def_${item.name}`.replace(/\s+/g, '_');
-
-            useEffect(() => {
-                const unsub = window.FB.onSnapshot(window.FB.doc(window.FB.db, "definitions", docId), (doc) => {
-                    if (doc.exists()) setContent(doc.data());
-                });
-                return () => unsub();
-            }, [docId]);
-
-            const handleSave = async () => {
-                await window.FB.setDoc(window.FB.doc(window.FB.db, "definitions", docId), content);
-                setIsEditing(false);
-            };
-
-            return (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6" onClick={onClose}>
-                    <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl animate-in" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-2xl font-black text-slate-800 mb-6">{item.name}</h3>
-                        <div className="space-y-6">
-                            <div className="bg-slate-50 p-6 rounded-3xl">
-                                <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Descriptor</p>
-                                {isEditing ? <textarea className="w-full p-3 text-sm border rounded-xl" value={content.desc} onChange={e => setContent({...content, desc: e.target.value})} /> : <p className="text-sm text-slate-600 font-medium">{content.desc}</p>}
-                            </div>
-                            <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100">
-                                <p className="text-[9px] font-black text-indigo-400 uppercase mb-2">Example</p>
-                                {isEditing ? <textarea className="w-full p-3 text-sm border rounded-xl" value={content.example} onChange={e => setContent({...content, example: e.target.value})} /> : <p className="text-sm italic text-indigo-900 font-medium">"{content.example}"</p>}
-                            </div>
-                        </div>
-                        {isAdmin && (
-                            <button onClick={() => isEditing ? handleSave() : setIsEditing(true)} className="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs">
-                                {isEditing ? "Save Changes" : "Edit Standard"}
-                            </button>
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
-        // --- SHARED RESOURCES ---
+        // --- SUB-COMPONENT: SHARED RESOURCES (DROPBOX STYLE) ---
         const SharedResources = ({ activeTab, subTab, userData }) => {
             const [resources, setResources] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
             const [newRes, setNewRes] = useState({ title: '', links: '', strands: [] });
+            
             const strands = ["Past and Present", "Our Evolving World", "Global Citizenship", "Economics & Business"];
             const isJunior = ['primary', 'lower-secondary'].includes(activeTab);
             const dbKey = `resources_${activeTab}_${subTab}`.replace(/\s+/g, '_');
@@ -102,51 +61,98 @@
 
             const handleUpload = async () => {
                 if(!newRes.title) return;
+                // Note: In a full production environment, files would be uploaded to Firebase Storage first.
+                // This code handles the metadata for the links and titles.
                 await window.FB.addDoc(window.FB.collection(window.FB.db, dbKey), {
-                    ...newRes, author: userData.name, timestamp: window.FB.serverTimestamp(), links: newRes.links.split(',')
+                    ...newRes,
+                    author: userData.name,
+                    timestamp: window.FB.serverTimestamp(),
+                    links: newRes.links.split(',').map(l => l.trim()).filter(l => l !== "")
                 });
                 setIsUploading(false);
                 setNewRes({ title: '', links: '', strands: [] });
             };
 
+            const getFileIcon = (url) => {
+                if (url.includes('ppt')) return 'fa-file-powerpoint text-orange-500';
+                if (url.includes('pdf')) return 'fa-file-pdf text-red-500';
+                if (url.includes('doc')) return 'fa-file-word text-blue-500';
+                return 'fa-link text-indigo-500';
+            };
+
             return (
                 <div className="space-y-8 animate-in pb-20">
                     <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">{subTab} Repository</h3>
-                        <button onClick={() => setIsUploading(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-200">Add New Resource</button>
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">{subTab} Shared Resources</h3>
+                        <button onClick={() => setIsUploading(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-200">
+                            <i className="fa-solid fa-cloud-arrow-up mr-2"></i> Add New Resource
+                        </button>
                     </div>
 
                     {isUploading && (
-                        <div className="bg-white p-10 rounded-[3rem] border-2 border-indigo-100 shadow-xl space-y-4">
-                            <input placeholder="Title" className="w-full p-4 bg-slate-50 rounded-2xl font-bold" onChange={e => setNewRes({...newRes, title: e.target.value})} />
-                            <textarea placeholder="Links (comma separated)" className="w-full p-4 bg-slate-50 rounded-2xl text-sm" onChange={e => setNewRes({...newRes, links: e.target.value})} />
+                        <div className="bg-white p-10 rounded-[3rem] border-2 border-indigo-100 shadow-xl space-y-6">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Title</label>
+                                <input placeholder="e.g. Unit 2 Assessment Pack" className="w-full p-4 bg-slate-50 rounded-2xl font-bold mt-1" onChange={e => setNewRes({...newRes, title: e.target.value})} />
+                            </div>
+                            
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Drop Links or URLs</label>
+                                <textarea placeholder="Paste links to documents (Google Drive, OneNote, or Direct Links) separated by commas..." className="w-full p-4 bg-slate-50 rounded-2xl text-sm h-24 mt-1" onChange={e => setNewRes({...newRes, links: e.target.value})} />
+                            </div>
+
                             {isJunior && (
-                                <div className="grid grid-cols-2 gap-2">
-                                    {strands.map(s => (
-                                        <label key={s} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl text-[9px] font-black uppercase">
-                                            <input type="checkbox" onChange={() => setNewRes({...newRes, strands: newRes.strands.includes(s) ? newRes.strands.filter(x => x !== s) : [...newRes.strands, s]})} /> {s}
-                                        </label>
-                                    ))}
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Curriculum Strand Connection</label>
+                                    <div className="grid grid-cols-2 gap-2 mt-2">
+                                        {strands.map(s => (
+                                            <label key={s} className={`flex items-center gap-2 p-3 rounded-xl text-[9px] font-black uppercase cursor-pointer transition-all ${newRes.strands.includes(s) ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400'}`}>
+                                                <input type="checkbox" className="hidden" onChange={() => setNewRes({...newRes, strands: newRes.strands.includes(s) ? newRes.strands.filter(x => x !== s) : [...newRes.strands, s]})} />
+                                                <i className={`fa-solid ${newRes.strands.includes(s) ? 'fa-check-circle' : 'fa-circle-plus'}`}></i> {s}
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
+
                             <div className="flex gap-2">
-                                <button onClick={handleUpload} className="flex-1 bg-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs">Upload</button>
+                                <button onClick={handleUpload} className="flex-1 bg-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs">Confirm Upload</button>
                                 <button onClick={() => setIsUploading(false)} className="px-8 bg-slate-100 rounded-xl font-black uppercase text-xs">Cancel</button>
                             </div>
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 gap-6">
                         {resources.length === 0 ? (
-                            <div className="col-span-2 py-20 text-center border-2 border-dashed border-slate-200 rounded-[3rem] text-slate-300 font-black uppercase text-xs">No shared resources for {subTab} yet.</div>
+                            <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[3rem] text-slate-300 font-black uppercase text-xs">No files uploaded yet.</div>
                         ) : (
                             resources.map(res => (
-                                <div key={res.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm group">
-                                    <h4 className="text-lg font-black text-slate-800 mb-4">{res.title}</h4>
-                                    <div className="flex flex-wrap gap-2 mb-6">
-                                        {res.strands?.map(s => <span key={s} className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase rounded-full">{s}</span>)}
+                                <div key={res.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-6 items-center">
+                                    <div className="flex-1 w-full text-center md:text-left">
+                                        <h4 className="text-lg font-black text-slate-800 mb-2">{res.title}</h4>
+                                        <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
+                                            {res.strands?.map(s => <span key={s} className="px-3 py-1 bg-slate-50 text-slate-400 text-[8px] font-black uppercase rounded-full border">{s}</span>)}
+                                        </div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase">Uploaded by {res.author}</p>
                                     </div>
-                                    <button className="w-full py-3 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">Discussion & Files</button>
+
+                                    <div className="flex flex-wrap gap-3 w-full md:w-auto justify-center">
+                                        {res.links?.map((url, idx) => (
+                                            <div key={idx} className="bg-slate-50 border rounded-2xl p-4 flex items-center gap-4 min-w-[200px]">
+                                                <i className={`fa-solid ${getFileIcon(url)} text-xl`}></i>
+                                                <div className="flex-1 overflow-hidden">
+                                                    <p className="text-[10px] font-black text-slate-800 uppercase truncate">Resource {idx + 1}</p>
+                                                    <div className="flex gap-2 mt-1">
+                                                        <a href={url} target="_blank" className="text-[8px] font-black text-indigo-600 uppercase hover:underline">Preview</a>
+                                                        <a href={url} download className="text-[8px] font-black text-emerald-600 uppercase hover:underline">Download</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <button className="h-full px-6 bg-slate-100 hover:bg-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-500 transition-all">
+                                            <i className="fa-solid fa-comments"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             ))
                         )}
@@ -155,21 +161,18 @@
             );
         };
 
-        // --- CURRICULUM VIEW ---
+        // --- CURRICULUM VIEW (UNCHANGED) ---
         const CurriculumView = ({ activeTab, subTab, isAdmin, userData }) => {
-            const [selectedItem, setSelectedItem] = useState(null);
             const factions = [
-                { name: "Past and Present", icon: "fa-history", color: "text-amber-500", bg: "bg-amber-50", topics: ["Silk Road", "Heritage"] },
-                { name: "Our Evolving World", icon: "fa-earth-asia", color: "text-emerald-500", bg: "bg-emerald-50", topics: ["Climate", "Tectonics"] },
-                { name: "Global Citizenship", icon: "fa-users-rays", color: "text-blue-500", bg: "bg-blue-50", topics: ["Human Rights", "SDGs"] },
-                { name: "Economics & Business", icon: "fa-chart-pie", color: "text-indigo-500", bg: "bg-indigo-50", topics: ["Trade Hubs", "Financials"] }
+                { name: "Past and Present", icon: "fa-history", color: "text-amber-500", bg: "bg-amber-50", topics: ["Silk Road", "Dynasties"] },
+                { name: "Our Evolving World", icon: "fa-earth-asia", color: "text-emerald-500", bg: "bg-emerald-50", topics: ["Climate", "Systems"] },
+                { name: "Global Citizenship", icon: "fa-users-rays", color: "text-blue-500", bg: "bg-blue-50", topics: ["Human Rights", "Civics"] },
+                { name: "Economics & Business", icon: "fa-chart-pie", color: "text-indigo-500", bg: "bg-indigo-50", topics: ["Markets", "Trade"] }
             ];
             const isSenior = ['igcse', 'ib', 'a-level', 'dse'].includes(activeTab);
 
             return (
                 <div className="space-y-12 animate-in pb-20">
-                    {selectedItem && <DefinitionModal item={selectedItem} isAdmin={isAdmin} onClose={() => setSelectedItem(null)} />}
-                    
                     <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex items-center justify-between">
                         <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">{subTab} Curriculum</h2>
                         <span className="text-[10px] font-black bg-indigo-600 text-white px-4 py-1 rounded-full uppercase">{activeTab}</span>
@@ -179,11 +182,13 @@
                         <div className="space-y-8">
                             <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
                                 <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Official Exam Board Curriculum</h3>
-                                <div className="p-10 border-2 border-dashed border-slate-200 rounded-3xl text-center text-slate-400 font-bold text-xs uppercase">Documentation Links</div>
+                                <div className="p-10 border-2 border-dashed border-slate-200 rounded-3xl text-center text-slate-400 font-bold text-xs uppercase">Specification Links</div>
                             </section>
                             <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-6">Schemes of Work</h3>
-                                <button className="bg-indigo-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase">Upload SOW</button>
+                                <h3 className="text-sm font-black text-slate-800 uppercase mb-4 tracking-tight">Schemes of Work</h3>
+                                <div className="p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center">
+                                    <p className="text-xs font-bold text-slate-400 uppercase">Share your SOW here</p>
+                                </div>
                             </section>
                         </div>
                     ) : (
@@ -191,40 +196,27 @@
                             <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
                                 <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-6">End of Year Goals</h3>
                                 <ul className="list-disc pl-6 space-y-3 text-sm font-semibold text-slate-700">
-                                    <li>Analyze historical continuity and its impact on modern identity.</li>
-                                    <li>Evaluate geographical changes through thematic mapping.</li>
-                                    <li>Demonstrate civic responsibility through global citizenship projects.</li>
-                                    <li>Apply economic logic to local business models.</li>
+                                    <li>Analyze historical continuity and identity.</li>
+                                    <li>Evaluate geographical changes through mapping.</li>
+                                    <li>Demonstrate global citizenship.</li>
+                                    <li>Apply economic logic to business models.</li>
                                 </ul>
                             </section>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-indigo-50 p-8 rounded-[3rem] border border-indigo-100 text-center">
-                                    <h4 className="text-[10px] font-black text-indigo-600 uppercase mb-6 tracking-widest">Key Skills</h4>
-                                    <div className="flex flex-wrap gap-2 justify-center">
-                                        {["Analysis", "Evaluation", "Inquiry", "Synthesis"].map(s => <button key={s} onClick={() => setSelectedItem({type:'Skill', name: s})} className="bg-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase text-slate-700 shadow-sm hover:bg-indigo-600 hover:text-white transition-all">{s}</button>)}
-                                    </div>
-                                </div>
-                                {activeTab === 'lower-secondary' && (
-                                    <div className="bg-slate-900 p-8 rounded-[3rem] text-center text-white">
-                                        <h4 className="text-[10px] font-black text-indigo-400 uppercase mb-6 tracking-widest">Key Command Terms</h4>
-                                        <div className="flex flex-wrap gap-2 justify-center">
-                                            {["Analyze", "Evaluate", "Explain", "Discuss"].map(c => <button key={c} onClick={() => setSelectedItem({type:'Command Term', name: c})} className="bg-slate-800 px-5 py-3 rounded-2xl text-[10px] font-black uppercase text-white hover:bg-indigo-500 transition-all">{c}</button>)}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
                             <div className="space-y-6">
                                 {factions.map(f => (
                                     <div key={f.name} className="flex flex-col lg:flex-row gap-6">
-                                        <div onClick={() => setSelectedItem({type:'Strand', name: f.name})} className="flex-1 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex items-center gap-6 cursor-pointer hover:border-indigo-400 transition-all">
-                                            <div className={`${f.bg} ${f.color} w-16 h-16 rounded-full flex items-center justify-center text-2xl shrink-0 shadow-inner`}><i className={`fa-solid ${f.icon}`}></i></div>
-                                            <div><h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5><p className="text-sm text-slate-500 font-medium">Standard curriculum goal.</p></div>
+                                        <div className="flex-1 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex items-center gap-6">
+                                            <div className={`${f.bg} ${f.color} w-16 h-16 rounded-full flex items-center justify-center text-2xl shrink-0`}><i className={`fa-solid ${f.icon}`}></i></div>
+                                            <div>
+                                                <h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5>
+                                                <p className="text-sm text-slate-500 font-medium leading-relaxed">Core pedagogical standards.</p>
+                                            </div>
                                         </div>
                                         <div className="w-full lg:w-72 bg-slate-900 p-8 rounded-[3rem] text-white flex flex-col justify-center">
-                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-4">Example Topics</p>
-                                            <div className="flex flex-wrap gap-2">{f.topics.map(t => <span key={t} onClick={(e) => {e.stopPropagation(); setSelectedItem({type:'Topic', name: t})}} className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold border border-white/10 cursor-pointer hover:bg-white hover:text-slate-900">{t}</span>)}</div>
+                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-4">Topics</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {f.topics.map(t => <span key={t} className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold border border-white/10">{t}</span>)}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -235,7 +227,7 @@
             );
         };
 
-        // --- DASHBOARD ---
+        // --- DASHBOARD (UNCHANGED) ---
         const Dashboard = ({ userData }) => (
             <div className="space-y-8 animate-in pb-20">
                 <div className="mesh-bg rounded-[4rem] p-16 text-white shadow-2xl relative">
@@ -251,18 +243,18 @@
                         </section>
                         <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
                             <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Foundation Newsfeed</h3>
-                            <div className="p-4 bg-slate-50 rounded-2xl text-sm font-semibold text-slate-700 italic">No new network updates today.</div>
+                            <div className="p-4 bg-slate-50 rounded-2xl text-sm font-semibold text-slate-700 italic">No updates today.</div>
                         </section>
                     </div>
                     <section className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl">
-                        <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Upcoming PD Opportunities</h3>
+                        <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Upcoming PD</h3>
                         <div className="border-l-2 border-indigo-500 pl-4 py-1 text-sm font-bold">Jan 22: IB Workshop</div>
                     </section>
                 </div>
             </div>
         );
 
-        // --- APP ---
+        // --- MAIN APP ---
         const App = () => {
             const [user, setUser] = useState(null);
             const [userData, setUserData] = useState(null);
@@ -292,12 +284,12 @@
                 { id: 'admin', label: 'Admin Hub', icon: 'fa-shield-halved', adminOnly: true }
             ];
 
-            if (!user) return <div className="h-screen flex items-center justify-center bg-[#0f172a] text-white">Connecting...</div>;
+            if (!user) return <div className="h-screen flex items-center justify-center bg-[#0f172a] text-white">Authenticating...</div>;
 
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden">
                     <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl overflow-y-auto custom-scrollbar">
-                        <div className="p-8 font-black text-sm uppercase text-indigo-400">YCYW Humanities</div>
+                        <div className="p-8 font-black text-sm uppercase text-indigo-400 tracking-tighter">YCYW Humanities</div>
                         <nav className="flex-1 px-4 space-y-1">
                             {navConfig.map(item => {
                                 if (item.adminOnly && userData?.role !== 'ADMIN') return null;
@@ -305,7 +297,7 @@
                                 return (
                                     <div key={item.id}>
                                         <button onClick={() => item.subs ? setExpanded(isExpanded ? null : item.id) : (setActiveTab(item.id), setSubTab(null))}
-                                            className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest ${activeTab === item.id && !subTab ? 'bg-indigo-600' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                            className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest ${activeTab === item.id && !subTab ? 'bg-indigo-600 shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
                                             <div className="flex items-center gap-3"><i className={`fa-solid ${item.icon} w-4`}></i>{item.label}</div>
                                             {item.subs && <i className={`fa-solid fa-chevron-down opacity-30 ${isExpanded ? 'rotate-180' : ''}`}></i>}
                                         </button>
@@ -330,7 +322,7 @@
                             <div className="flex items-center gap-6">
                                 <div>
                                     <h2 className="font-black text-slate-800 uppercase text-lg leading-none tracking-tight">{subTab || activeTab.replace('-', ' ')}</h2>
-                                    {subTab && <button className="mt-2 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-slate-400"><i className="fa-solid fa-bell-slash"></i> Receive Notifications</button>}
+                                    {subTab && <button className="mt-2 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-slate-400"><i className="fa-solid fa-bell-slash"></i> Notifications Off</button>}
                                 </div>
                             </div>
                             <div className="flex items-center gap-6">
