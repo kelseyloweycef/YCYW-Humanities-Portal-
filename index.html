@@ -44,16 +44,15 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- SUB-COMPONENT: POPUP MODAL FOR DEFINITIONS ---
+        // --- DEFINITION MODAL ---
         const DefinitionModal = ({ item, onClose, isAdmin }) => {
             const [isEditing, setIsEditing] = useState(false);
-            const [content, setContent] = useState({ desc: "Loading...", example: "Loading..." });
+            const [content, setContent] = useState({ desc: "Standard definition not set.", example: "No example provided." });
             const docId = `def_${item.name}`.replace(/\s+/g, '_');
 
             useEffect(() => {
                 const unsub = window.FB.onSnapshot(window.FB.doc(window.FB.db, "definitions", docId), (doc) => {
                     if (doc.exists()) setContent(doc.data());
-                    else setContent({ desc: "Standard definition not yet set.", example: "No example provided." });
                 });
                 return () => unsub();
             }, [docId]);
@@ -87,13 +86,11 @@
             );
         };
 
-        // --- SUB-COMPONENT: SHARED RESOURCES ---
+        // --- SHARED RESOURCES ---
         const SharedResources = ({ activeTab, subTab, userData }) => {
             const [resources, setResources] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
             const [newRes, setNewRes] = useState({ title: '', links: '', strands: [] });
-            const [selectedRes, setSelectedRes] = useState(null);
-
             const strands = ["Past and Present", "Our Evolving World", "Global Citizenship", "Economics & Business"];
             const isJunior = ['primary', 'lower-secondary'].includes(activeTab);
             const dbKey = `resources_${activeTab}_${subTab}`.replace(/\s+/g, '_');
@@ -114,9 +111,9 @@
 
             return (
                 <div className="space-y-8 animate-in pb-20">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Shared Resources</h3>
-                        <button onClick={() => setIsUploading(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest">Add New Resource</button>
+                    <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">{subTab} Repository</h3>
+                        <button onClick={() => setIsUploading(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-200">Add New Resource</button>
                     </div>
 
                     {isUploading && (
@@ -140,21 +137,25 @@
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {resources.map(res => (
-                            <div key={res.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm group">
-                                <h4 className="text-lg font-black text-slate-800 mb-4">{res.title}</h4>
-                                <div className="flex flex-wrap gap-2 mb-6">
-                                    {res.strands?.map(s => <span key={s} className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase rounded-full">{s}</span>)}
+                        {resources.length === 0 ? (
+                            <div className="col-span-2 py-20 text-center border-2 border-dashed border-slate-200 rounded-[3rem] text-slate-300 font-black uppercase text-xs">No shared resources for {subTab} yet.</div>
+                        ) : (
+                            resources.map(res => (
+                                <div key={res.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm group">
+                                    <h4 className="text-lg font-black text-slate-800 mb-4">{res.title}</h4>
+                                    <div className="flex flex-wrap gap-2 mb-6">
+                                        {res.strands?.map(s => <span key={s} className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase rounded-full">{s}</span>)}
+                                    </div>
+                                    <button className="w-full py-3 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">Discussion & Files</button>
                                 </div>
-                                <button onClick={() => setSelectedRes(res)} className="w-full py-3 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">Discussion & Files</button>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                 </div>
             );
         };
 
-        // --- COMPONENT: CURRICULUM VIEW ---
+        // --- CURRICULUM VIEW ---
         const CurriculumView = ({ activeTab, subTab, isAdmin, userData }) => {
             const [selectedItem, setSelectedItem] = useState(null);
             const factions = [
@@ -168,11 +169,17 @@
             return (
                 <div className="space-y-12 animate-in pb-20">
                     {selectedItem && <DefinitionModal item={selectedItem} isAdmin={isAdmin} onClose={() => setSelectedItem(null)} />}
+                    
+                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                        <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">{subTab} Curriculum</h2>
+                        <span className="text-[10px] font-black bg-indigo-600 text-white px-4 py-1 rounded-full uppercase">{activeTab}</span>
+                    </div>
+
                     {isSenior ? (
                         <div className="space-y-8">
                             <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
                                 <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Official Exam Board Curriculum</h3>
-                                <div className="p-10 border-2 border-dashed border-slate-200 rounded-3xl text-center text-slate-400 font-bold text-xs uppercase cursor-pointer hover:bg-slate-50">Specifications</div>
+                                <div className="p-10 border-2 border-dashed border-slate-200 rounded-3xl text-center text-slate-400 font-bold text-xs uppercase">Documentation Links</div>
                             </section>
                             <section className="bg-white p-10 rounded-[3rem] border shadow-sm">
                                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-6">Schemes of Work</h3>
@@ -190,28 +197,30 @@
                                     <li>Apply economic logic to local business models.</li>
                                 </ul>
                             </section>
-                            <div className={`grid gap-6 ${activeTab === 'lower-secondary' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="bg-indigo-50 p-8 rounded-[3rem] border border-indigo-100 text-center">
                                     <h4 className="text-[10px] font-black text-indigo-600 uppercase mb-6 tracking-widest">Key Skills</h4>
                                     <div className="flex flex-wrap gap-2 justify-center">
-                                        {["Analysis", "Evaluation", "Inquiry"].map(s => <button key={s} onClick={() => setSelectedItem({type:'Skill', name: s})} className="bg-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase text-slate-700 shadow-sm">{s}</button>)}
+                                        {["Analysis", "Evaluation", "Inquiry", "Synthesis"].map(s => <button key={s} onClick={() => setSelectedItem({type:'Skill', name: s})} className="bg-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase text-slate-700 shadow-sm hover:bg-indigo-600 hover:text-white transition-all">{s}</button>)}
                                     </div>
                                 </div>
                                 {activeTab === 'lower-secondary' && (
                                     <div className="bg-slate-900 p-8 rounded-[3rem] text-center text-white">
                                         <h4 className="text-[10px] font-black text-indigo-400 uppercase mb-6 tracking-widest">Key Command Terms</h4>
                                         <div className="flex flex-wrap gap-2 justify-center">
-                                            {["Analyze", "Evaluate"].map(c => <button key={c} onClick={() => setSelectedItem({type:'Command Term', name: c})} className="bg-slate-800 px-5 py-3 rounded-2xl text-[10px] font-black uppercase text-white">{c}</button>)}
+                                            {["Analyze", "Evaluate", "Explain", "Discuss"].map(c => <button key={c} onClick={() => setSelectedItem({type:'Command Term', name: c})} className="bg-slate-800 px-5 py-3 rounded-2xl text-[10px] font-black uppercase text-white hover:bg-indigo-500 transition-all">{c}</button>)}
                                         </div>
                                     </div>
                                 )}
                             </div>
+
                             <div className="space-y-6">
                                 {factions.map(f => (
                                     <div key={f.name} className="flex flex-col lg:flex-row gap-6">
                                         <div onClick={() => setSelectedItem({type:'Strand', name: f.name})} className="flex-1 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex items-center gap-6 cursor-pointer hover:border-indigo-400 transition-all">
-                                            <div className={`${f.bg} ${f.color} w-16 h-16 rounded-full flex items-center justify-center text-2xl shrink-0`}><i className={`fa-solid ${f.icon}`}></i></div>
-                                            <div><h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5><p className="text-sm text-slate-500 font-medium tracking-tight">Standard curriculum goal.</p></div>
+                                            <div className={`${f.bg} ${f.color} w-16 h-16 rounded-full flex items-center justify-center text-2xl shrink-0 shadow-inner`}><i className={`fa-solid ${f.icon}`}></i></div>
+                                            <div><h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5><p className="text-sm text-slate-500 font-medium">Standard curriculum goal.</p></div>
                                         </div>
                                         <div className="w-full lg:w-72 bg-slate-900 p-8 rounded-[3rem] text-white flex flex-col justify-center">
                                             <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-4">Example Topics</p>
@@ -226,8 +235,8 @@
             );
         };
 
-        // --- COMPONENT: DASHBOARD ---
-        const Dashboard = ({ userData, isSubscribed }) => (
+        // --- DASHBOARD ---
+        const Dashboard = ({ userData }) => (
             <div className="space-y-8 animate-in pb-20">
                 <div className="mesh-bg rounded-[4rem] p-16 text-white shadow-2xl relative">
                     <div className="mesh-circle"></div>
@@ -238,22 +247,22 @@
                     <div className="lg:col-span-2 space-y-8">
                         <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
                             <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Your Notified Subjects</h3>
-                            {isSubscribed ? <div className="p-4 bg-emerald-50 text-emerald-700 rounded-2xl font-bold text-xs uppercase">New Updates Available</div> : <div className="py-10 text-center border-2 border-dashed rounded-3xl text-slate-300 font-bold text-xs uppercase">No active subscriptions</div>}
+                            <div className="py-10 text-center border-2 border-dashed rounded-3xl text-slate-300 font-bold text-xs uppercase">No active subscriptions</div>
                         </section>
                         <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
                             <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Foundation Newsfeed</h3>
-                            <div className="p-4 bg-slate-50 rounded-2xl text-sm font-semibold text-slate-700">Symposium 2025 registration is now open!</div>
+                            <div className="p-4 bg-slate-50 rounded-2xl text-sm font-semibold text-slate-700 italic">No new network updates today.</div>
                         </section>
                     </div>
                     <section className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl">
                         <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Upcoming PD Opportunities</h3>
-                        <div className="border-l-2 border-indigo-500 pl-4 py-1 text-sm font-bold tracking-tight">Jan 22: Network Training</div>
+                        <div className="border-l-2 border-indigo-500 pl-4 py-1 text-sm font-bold">Jan 22: IB Workshop</div>
                     </section>
                 </div>
             </div>
         );
 
-        // --- MAIN APP ---
+        // --- APP ---
         const App = () => {
             const [user, setUser] = useState(null);
             const [userData, setUserData] = useState(null);
@@ -261,7 +270,6 @@
             const [subTab, setSubTab] = useState(null);
             const [expanded, setExpanded] = useState(null); 
             const [viewMode, setViewMode] = useState('curriculum');
-            const [isSubscribed, setIsSubscribed] = useState(false);
 
             useEffect(() => {
                 const unsub = window.FB.onAuthStateChanged(window.FB.auth, async (u) => {
@@ -297,7 +305,7 @@
                                 return (
                                     <div key={item.id}>
                                         <button onClick={() => item.subs ? setExpanded(isExpanded ? null : item.id) : (setActiveTab(item.id), setSubTab(null))}
-                                            className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest ${activeTab === item.id && !subTab ? 'bg-indigo-600 shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                            className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest ${activeTab === item.id && !subTab ? 'bg-indigo-600' : 'text-slate-400 hover:bg-slate-800'}`}>
                                             <div className="flex items-center gap-3"><i className={`fa-solid ${item.icon} w-4`}></i>{item.label}</div>
                                             {item.subs && <i className={`fa-solid fa-chevron-down opacity-30 ${isExpanded ? 'rotate-180' : ''}`}></i>}
                                         </button>
@@ -315,7 +323,6 @@
                                 );
                             })}
                         </nav>
-                        <div className="p-4 border-t border-slate-800"><button onClick={() => window.FB.signOut(window.FB.auth)} className="w-full p-4 bg-slate-800 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:text-red-400">Logout</button></div>
                     </div>
 
                     <div className="flex-1 flex flex-col overflow-hidden">
@@ -323,7 +330,7 @@
                             <div className="flex items-center gap-6">
                                 <div>
                                     <h2 className="font-black text-slate-800 uppercase text-lg leading-none tracking-tight">{subTab || activeTab.replace('-', ' ')}</h2>
-                                    {subTab && <button onClick={() => setIsSubscribed(!isSubscribed)} className={`mt-2 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest ${isSubscribed ? 'text-emerald-500' : 'text-slate-400'}`}><i className={`fa-solid ${isSubscribed ? 'fa-bell' : 'fa-bell-slash'}`}></i>{isSubscribed ? 'Subscribed' : 'Notifications Off'}</button>}
+                                    {subTab && <button className="mt-2 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-slate-400"><i className="fa-solid fa-bell-slash"></i> Receive Notifications</button>}
                                 </div>
                             </div>
                             <div className="flex items-center gap-6">
@@ -342,7 +349,7 @@
                         </header>
                         <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc]">
                             {activeTab === 'dashboard' ? (
-                                <Dashboard userData={userData} isSubscribed={isSubscribed} />
+                                <Dashboard userData={userData} />
                             ) : subTab ? (
                                 viewMode === 'curriculum' ? 
                                 <CurriculumView activeTab={activeTab} subTab={subTab} isAdmin={userData?.role === 'ADMIN'} userData={userData} /> : 
