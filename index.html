@@ -44,7 +44,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        const StandardsView = ({ activeTab, subTab, isAdmin, userData }) => {
+        const CurriculumView = ({ activeTab, subTab, isAdmin, userData }) => {
             const [message, setMessage] = useState('');
             
             const factions = [
@@ -90,8 +90,8 @@
                                 <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-6">End of Year Goals</h3>
                                 <ul className="list-disc pl-6 space-y-3 text-sm font-semibold text-slate-700">
                                     <li>Analyze historical continuity and its impact on modern identity.</li>
-                                    <li>Evaluate geographical shifts through thematic mapping.</li>
-                                    <li>Demonstrate civic responsibility through citizenship projects.</li>
+                                    <li>Evaluate geographical changes through thematic mapping.</li>
+                                    <li>Demonstrate civic responsibility through global citizenship projects.</li>
                                     <li>Apply economic logic to local business models.</li>
                                 </ul>
                             </section>
@@ -124,7 +124,7 @@
                                             <div className={`${f.bg} ${f.color} w-16 h-16 rounded-full flex items-center justify-center text-2xl shrink-0`}><i className={`fa-solid ${f.icon}`}></i></div>
                                             <div>
                                                 <h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5>
-                                                <p className="text-xs text-slate-400 font-bold uppercase mb-2 tracking-widest">Standard</p>
+                                                <p className="text-xs text-slate-400 font-bold uppercase mb-2 tracking-widest">Curriculum Standard</p>
                                                 <p className="text-sm text-slate-500 font-medium leading-relaxed">Network goals for {subTab} learners.</p>
                                             </div>
                                         </div>
@@ -181,7 +181,7 @@
             const [activeTab, setActiveTab] = useState('dashboard');
             const [subTab, setSubTab] = useState(null);
             const [expanded, setExpanded] = useState(null); 
-            const [viewMode, setViewMode] = useState('standards');
+            const [viewMode, setViewMode] = useState('curriculum');
             const [isSubscribed, setIsSubscribed] = useState(false);
             const [unreadCount, setUnreadCount] = useState(0);
 
@@ -226,7 +226,7 @@
                                         {item.subs && isExpanded && (
                                             <div className="ml-6 space-y-1 mt-1 border-l border-slate-700/50">
                                                 {item.subs.map(sub => (
-                                                    <button key={sub} onClick={() => { setActiveTab(item.id); setSubTab(sub); setViewMode('standards'); }}
+                                                    <button key={sub} onClick={() => { setActiveTab(item.id); setSubTab(sub); setViewMode('curriculum'); }}
                                                         className={`w-full text-left px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest ${subTab === sub ? 'text-indigo-400 bg-slate-800' : 'text-slate-500 hover:text-slate-300'}`}>
                                                         {sub}
                                                     </button>
@@ -257,7 +257,7 @@
                             <div className="flex items-center gap-6">
                                 {subTab && (
                                     <div className="bg-slate-100 p-1 rounded-2xl flex gap-1 shadow-inner">
-                                        <button onClick={() => setViewMode('standards')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'standards' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Standards</button>
+                                        <button onClick={() => setViewMode('curriculum')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'curriculum' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Curriculum</button>
                                         <button onClick={() => setViewMode('library')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'library' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Library</button>
                                     </div>
                                 )}
@@ -274,7 +274,7 @@
                             {activeTab === 'dashboard' ? (
                                 <Dashboard userData={userData} isSubscribed={isSubscribed} />
                             ) : subTab ? (
-                                <StandardsView activeTab={activeTab} subTab={subTab} isAdmin={userData?.role === 'ADMIN'} userData={userData} />
+                                <CurriculumView activeTab={activeTab} subTab={subTab} isAdmin={userData?.role === 'ADMIN'} userData={userData} />
                             ) : (
                                 <div className="text-center py-40 text-slate-300 font-black uppercase text-[10px] tracking-[0.5em]">
                                     Select a year group to begin
