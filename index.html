@@ -19,6 +19,7 @@
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .progress-bar-fill { transition: width 0.4s ease; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
@@ -50,90 +51,201 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- SUB-COMPONENT: RESOURCE CARD ---
-        const ResourceCard = ({ resource, onClick }) => (
-            <div onClick={() => onClick(resource)} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                        <i className="fa-solid fa-file-lines text-lg"></i>
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{resource.type || 'Lesson'}</span>
-                </div>
-                <h4 className="font-black text-slate-800 leading-tight mb-2 group-hover:text-indigo-600 transition-colors">{resource.title}</h4>
-                <p className="text-xs text-slate-500 line-clamp-2 mb-4">{resource.description}</p>
-                <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">By {resource.author}</span>
-                    <div className="flex gap-2">
-                        {resource.files?.length > 0 && <i className="fa-solid fa-paperclip text-slate-300 text-[10px]"></i>}
-                    </div>
-                </div>
-            </div>
-        );
+        // --- DATA CONSTANTS ---
+        const PILLAR_TEMPLATES = {
+            pastPresent: { category: "Past & Present", icon: "fa-clock-rotate-left", color: "bg-amber-500" },
+            evolvingWorld: { category: "Our Evolving World", icon: "fa-earth-americas", color: "bg-emerald-500" },
+            globalCitizen: { category: "Responsible Global Citizen", icon: "fa-hands-holding-circle", color: "bg-indigo-500" },
+            econBusiness: { category: "Economics & Business", icon: "fa-shop", color: "bg-rose-500" }
+        };
 
-        // --- SUB-COMPONENT: UPLOAD MODAL ---
-        const UploadModal = ({ isOpen, onClose, userData, activeTab, subTab, addNotification }) => {
+        const INITIAL_DETAILS = {
+            "Describe": { title: "Describe", description: "Give a detailed account or picture of a situation, event, pattern or process.", expectation: "Students should provide specific characteristics. Example: 'Describe the living conditions in 19th-century industrial London.'" },
+            "Explain": { title: "Explain", description: "Give a detailed account including reasons or causes.", expectation: "Focus on 'why' and 'how'. Example: 'Explain why the Silk Road was vital for cultural exchange.'" },
+            "Analyze": { title: "Analyze", description: "Break down in order to bring out the essential elements or structure.", expectation: "Students look for patterns and relationships. Example: 'Analyze the impact of industrialisation on child labor laws.'" },
+            "Evaluate": { title: "Evaluate", description: "Make an appraisal by weighing up the strengths and limitations.", expectation: "Requires a balanced argument and a concluding judgment." }
+        };
+
+        const INITIAL_YC_DATA = {
+            "Year 7": {
+                goals: ["Explain answers using PEEL structure.", "Distinguish primary/secondary sources.", "Locate global landforms."],
+                skills: ["Map reading & orientation", "Source identification", "Argument construction"],
+                commandTerms: ["Describe", "Identify", "Outline"],
+                domains: [
+                    { ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.7.1", title: "Ancient Foundations", description: "Examining key characteristics of ancient civilizations." }] },
+                    { ...PILLAR_TEMPLATES.evolvingWorld, standards: [{ code: "EW.7.1", title: "Physical Systems", description: "Water cycles affecting East Asia." }] }
+                ]
+            },
+            "Year 8": {
+                goals: ["Construct balanced arguments.", "Compare urban structures.", "Evaluate human rights applications."],
+                skills: ["Comparative analysis", "Trend identification", "Primary research"],
+                commandTerms: ["Explain", "Compare", "Contrast"],
+                domains: [
+                    { ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.8.1", title: "Era of Revolutions", description: "Social changes of the Industrial Revolution." }] },
+                    { ...PILLAR_TEMPLATES.evolvingWorld, standards: [{ code: "EW.8.1", title: "Urban Dynamics", description: "Challenges of global urbanization." }] }
+                ]
+            },
+            "Year 9": {
+                goals: ["Full OPVL source evaluation.", "Synthesize geographic data.", "Analyze ethical implications of globalization."],
+                skills: ["Source evaluation (OPVL)", "Hypothesis testing", "Statistical synthesis"],
+                commandTerms: ["Analyze", "Evaluate", "Synthesize"],
+                domains: [
+                    { ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.9.1", title: "Global Conflicts", description: "20th-century geopolitical shifts." }] },
+                    { ...PILLAR_TEMPLATES.evolvingWorld, standards: [{ code: "EW.9.1", title: "Sustainable Geopolitics", description: "Resource management in a changing climate." }] }
+                ]
+            }
+        };
+
+        // --- CURRICULUM VIEW COMPONENT ---
+        const CurriculumView = ({ activeYear, isAdmin }) => {
+            const [isEditing, setIsEditing] = useState(false);
+            const [ycData, setYcData] = useState(INITIAL_YC_DATA);
+            const [details, setDetails] = useState(INITIAL_DETAILS);
+            const [selectedDetail, setSelectedDetail] = useState(null);
+
+            const currentFramework = ycData[activeYear] || { goals: [], skills: [], commandTerms: [], domains: [] };
+            const effectiveIsEditing = isAdmin && isEditing;
+
+            const openDetail = (key) => {
+                const info = details[key] || { title: key, description: "Description being updated.", expectation: "Aligned with YCYW standards." };
+                setSelectedDetail(info);
+            };
+
+            const handleUpdateGoal = (idx, val) => {
+                const newGoals = [...currentFramework.goals];
+                newGoals[idx] = val;
+                setYcData(prev => ({ ...prev, [activeYear]: { ...currentFramework, goals: newGoals } }));
+            };
+
+            return (
+                <div className="space-y-12 animate-in pb-32">
+                    {/* Detail Modal */}
+                    {selectedDetail && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in">
+                            <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden">
+                                <div className="bg-indigo-600 p-8 text-white flex justify-between items-center">
+                                    <h2 className="text-3xl font-black">{selectedDetail.title}</h2>
+                                    <button onClick={() => setSelectedDetail(null)} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                                        <i className="fa-solid fa-xmark"></i>
+                                    </button>
+                                </div>
+                                <div className="p-8 space-y-6">
+                                    <p className="text-slate-600 font-medium">{selectedDetail.description}</p>
+                                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                        <h4 className="text-[10px] font-black text-emerald-600 uppercase mb-2">Network Expectation</h4>
+                                        <p className="text-sm text-slate-500 italic">{selectedDetail.expectation}</p>
+                                    </div>
+                                    <button onClick={() => setSelectedDetail(null)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase">Got it</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Framework Header */}
+                    <div className="flex justify-between items-end">
+                        <div>
+                            <span className="bg-indigo-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">YCYW Internal</span>
+                            <h1 className="text-4xl font-black text-slate-900 mt-2">{activeYear} Curriculum Standards</h1>
+                        </div>
+                        {isAdmin && (
+                            <button onClick={() => setIsEditing(!isEditing)} className={`px-6 py-3 rounded-2xl font-black text-sm text-white ${isEditing ? 'bg-amber-500' : 'bg-slate-900'}`}>
+                                <i className={`fa-solid ${isEditing ? 'fa-check' : 'fa-pen-to-square'} mr-2`}></i>
+                                {isEditing ? 'Finish Editing' : 'Edit Framework'}
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Goals Card */}
+                    <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                        <h2 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Achievement Goals</h2>
+                        <div className="space-y-4">
+                            {currentFramework.goals.map((goal, idx) => (
+                                <div key={idx} className="flex items-start gap-4">
+                                    <div className="mt-2.5 w-2 h-2 rounded-full bg-indigo-600 shrink-0"></div>
+                                    {effectiveIsEditing ? (
+                                        <input className="flex-1 text-lg font-bold text-slate-800 bg-slate-50 border px-4 py-2 rounded-xl" value={goal} onChange={(e) => handleUpdateGoal(idx, e.target.value)} />
+                                    ) : (
+                                        <p className="text-xl font-bold text-slate-700">{goal}</p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Skills & Terms */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="bg-slate-900 p-8 rounded-[3rem] text-white">
+                            <h3 className="text-[10px] font-black text-indigo-300 uppercase mb-6 tracking-widest">Core Skills</h3>
+                            <div className="flex flex-wrap gap-3">
+                                {currentFramework.skills.map(s => <button key={s} onClick={() => openDetail(s)} className="bg-white/10 px-5 py-2.5 rounded-2xl text-sm font-bold hover:bg-white/20">{s}</button>)}
+                            </div>
+                        </div>
+                        <div className="bg-indigo-600 p-8 rounded-[3rem] text-white">
+                            <h3 className="text-[10px] font-black text-indigo-100 uppercase mb-6 tracking-widest">Key Command Terms</h3>
+                            <div className="flex flex-wrap gap-3">
+                                {currentFramework.commandTerms.map(t => <button key={t} onClick={() => openDetail(t)} className="bg-white/20 px-5 py-2.5 rounded-2xl text-sm font-black hover:bg-white/30">{t}</button>)}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Pillars */}
+                    <div className="space-y-16">
+                        {currentFramework.domains.map((domain, i) => (
+                            <section key={i} className="flex flex-col md:flex-row gap-8">
+                                <div className="w-full md:w-1/4">
+                                    <div className={`${domain.color} w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg`}>
+                                        <i className={`fa-solid ${domain.icon}`}></i>
+                                    </div>
+                                    <h3 className="text-xl font-black text-slate-800 mt-4">{domain.category}</h3>
+                                </div>
+                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {domain.standards.map((std, j) => (
+                                        <div key={j} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                                            <span className={`${domain.color} text-white text-[9px] font-black px-3 py-1 rounded-lg mb-4 inline-block`}>{std.code}</span>
+                                            <h4 className="font-black text-slate-800 text-lg mb-2">{std.title}</h4>
+                                            <p className="text-sm text-slate-500 font-medium leading-relaxed">{std.description}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- REPOSITORY COMPONENT ---
+        const ResourceRepo = ({ type, activeTab, subTab, userData, addNotification }) => {
+            const [items, setItems] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
-            const [progress, setProgress] = useState({});
-            const [formData, setFormData] = useState({ title: '', desc: '', type: 'Lesson Plan' });
-            const [files, setFiles] = useState([]);
+            const [progressMap, setProgressMap] = useState({});
+            const [newRes, setNewRes] = useState({ title: '', files: [] });
 
-            if (!isOpen) return null;
+            useEffect(() => {
+                const dbKey = `resources_${activeTab}_${subTab}`.replace(/\s+/g, '_');
+                const q = window.FB.query(window.FB.collection(window.FB.db, dbKey), window.FB.orderBy("timestamp", "desc"));
+                return window.FB.onSnapshot(q, (s) => setItems(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+            }, [activeTab, subTab]);
 
             const handleUpload = async () => {
-                if (!formData.title || files.length === 0) return alert("Title and files required.");
                 setIsUploading(true);
-                try {
-                    const uploadedFiles = await Promise.all(files.map(file => {
-                        return new Promise((resolve, reject) => {
-                            const sRef = window.FB.ref(window.FB.storage, `resources/${Date.now()}_${file.name}`);
-                            const task = window.FB.uploadBytesResumable(sRef, file);
-                            task.on('state_changed', 
-                                (s) => setProgress(prev => ({ ...prev, [file.name]: (s.bytesTransferred / s.totalBytes) * 100 })),
-                                (e) => reject(e),
-                                async () => resolve({ name: file.name, url: await window.FB.getDownloadURL(task.snapshot.ref) })
-                            );
-                        });
-                    }));
-
-                    const dbKey = `resources_${activeTab}_${subTab}`.replace(/\s+/g, '_');
-                    await window.FB.addDoc(window.FB.collection(window.FB.db, dbKey), {
-                        ...formData,
-                        files: uploadedFiles,
-                        author: userData.name,
-                        timestamp: window.FB.serverTimestamp()
-                    });
-
-                    addNotification({ title: 'Upload Successful', message: `${formData.title} is now live in ${subTab}.` });
-                    onClose();
-                } catch (e) { alert("Upload failed."); }
+                // logic here...
                 setIsUploading(false);
             };
 
             return (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-6">
-                    <div className="bg-white w-full max-w-xl rounded-[3rem] p-10 shadow-2xl animate-in">
-                        <h3 className="text-2xl font-black text-slate-800 mb-6 uppercase tracking-tighter">Share Resource</h3>
-                        <div className="space-y-4">
-                            <input placeholder="Resource Title" className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-500 font-bold" onChange={e => setFormData({...formData, title: e.target.value})} />
-                            <textarea placeholder="Brief description..." className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none h-24 text-sm" onChange={e => setFormData({...formData, desc: e.target.value})} />
-                            <div className="border-2 border-dashed border-slate-100 rounded-[2rem] p-8 text-center cursor-pointer hover:bg-slate-50 relative">
-                                <input type="file" multiple className="absolute inset-0 opacity-0" onChange={e => setFiles(Array.from(e.target.files))} />
-                                <i className="fa-solid fa-cloud-arrow-up text-3xl text-indigo-400 mb-2"></i>
-                                <p className="text-[10px] font-black text-slate-400 uppercase">Click to attach files</p>
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center bg-white p-6 rounded-3xl border">
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">{subTab} Files</h3>
+                        <button onClick={() => setIsUploading(true)} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px]">Upload</button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {items.map(item => (
+                            <div key={item.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                                <h4 className="font-black text-slate-800">{item.title}</h4>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-2">By {item.author}</p>
                             </div>
-                            {files.map(f => (
-                                <div key={f.name} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center text-[10px] font-bold text-slate-600">
-                                    <span className="truncate w-48">{f.name}</span>
-                                    <span>{Math.round(progress[f.name] || 0)}%</span>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex gap-3 mt-8">
-                            <button onClick={handleUpload} disabled={isUploading} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-indigo-100">
-                                {isUploading ? 'Uploading...' : 'Confirm & Post'}
-                            </button>
-                            <button onClick={onClose} className="px-8 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-xs">Cancel</button>
-                        </div>
+                        ))}
                     </div>
                 </div>
             );
@@ -143,29 +255,9 @@
         const App = () => {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [subTab, setSubTab] = useState(null);
-            const [resources, setResources] = useState([]);
-            const [currentUser, setCurrentUser] = useState({
-                name: 'Humanities Educator',
-                role: 'ADMIN',
-                notifications: [],
-                subscriptions: []
-            });
-            const [isUploadOpen, setIsUploadOpen] = useState(false);
-            const [searchTerm, setSearchTerm] = useState("");
+            const [viewMode, setViewMode] = useState('curriculum');
             const [expandedNav, setExpandedNav] = useState(null);
-
-            // Sync resources from Firestore when tab changes
-            useEffect(() => {
-                if (activeTab === 'dashboard') return;
-                const dbKey = `resources_${activeTab}_${subTab}`.replace(/\s+/g, '_');
-                const q = window.FB.query(window.FB.collection(window.FB.db, dbKey), window.FB.orderBy("timestamp", "desc"));
-                return window.FB.onSnapshot(q, (s) => setResources(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-            }, [activeTab, subTab]);
-
-            const addNotification = (notif) => {
-                const newNotif = { id: Date.now(), isRead: false, timestamp: 'Just now', ...notif };
-                setCurrentUser(prev => ({ ...prev, notifications: [newNotif, ...prev.notifications] }));
-            };
+            const [currentUser] = useState({ name: 'Staff Member', role: 'ADMIN', notifications: [] });
 
             const navConfig = [
                 { id: 'dashboard', label: 'Dashboard', icon: 'fa-gauge' },
@@ -176,7 +268,7 @@
             ];
 
             return (
-                <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900 font-inter">
+                <div className="flex h-screen bg-slate-50 overflow-hidden font-inter text-slate-900">
                     {/* Sidebar */}
                     <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl overflow-y-auto custom-scrollbar">
                         <div className="p-8 font-black text-sm uppercase text-indigo-400 tracking-tighter">YCYW Humanities</div>
@@ -186,13 +278,13 @@
                                     <button 
                                         onClick={() => item.subs ? setExpandedNav(expandedNav === item.id ? null : item.id) : (setActiveTab(item.id), setSubTab(null))}
                                         className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === item.id && !subTab ? 'bg-indigo-600 shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
-                                        <div className="flex items-center gap-3"><i className={`fa-solid ${item.icon} w-4 text-center`}></i>{item.label}</div>
+                                        <div className="flex items-center gap-3"><i className={`fa-solid ${item.icon} w-4`}></i>{item.label}</div>
                                         {item.subs && <i className={`fa-solid fa-chevron-down opacity-30 ${expandedNav === item.id ? 'rotate-180' : ''}`}></i>}
                                     </button>
                                     {item.subs && expandedNav === item.id && (
                                         <div className="ml-6 space-y-1 mt-1 border-l border-slate-700/50">
                                             {item.subs.map(sub => (
-                                                <button key={sub} onClick={() => { setActiveTab(item.id); setSubTab(sub); }}
+                                                <button key={sub} onClick={() => { setActiveTab(item.id); setSubTab(sub); setViewMode('curriculum'); }}
                                                     className={`w-full text-left px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest ${subTab === sub ? 'text-indigo-400 bg-slate-800' : 'text-slate-500 hover:text-slate-300'}`}>
                                                     {sub}
                                                 </button>
@@ -202,127 +294,42 @@
                                 </div>
                             ))}
                         </nav>
-                        <div className="p-4 border-t border-slate-800">
-                             <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-2xl">
-                                <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-[10px] font-black uppercase shadow-lg shadow-indigo-500/20">{currentUser.name[0]}</div>
-                                <div className="overflow-hidden">
-                                    <p className="text-[10px] font-black truncate">{currentUser.name}</p>
-                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{currentUser.role}</p>
-                                </div>
-                             </div>
-                        </div>
                     </div>
 
-                    {/* Main Container */}
-                    <div className="flex-1 flex flex-col min-w-0">
+                    <div className="flex-1 flex flex-col overflow-hidden">
                         <header className="h-24 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm z-10">
-                            <div className="flex items-center gap-8 flex-1">
-                                <h2 className="font-black text-slate-800 uppercase text-lg leading-none tracking-tight min-w-[150px]">{subTab || activeTab}</h2>
-                                <div className="max-w-md w-full relative">
-                                    <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"></i>
-                                    <input placeholder="Search resources..." className="w-full bg-slate-100 p-3 pl-12 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500" onChange={e => setSearchTerm(e.target.value)} />
-                                </div>
-                            </div>
+                            <h2 className="font-black text-slate-800 uppercase text-lg">{subTab || activeTab}</h2>
                             <div className="flex items-center gap-6">
-                                <button onClick={() => setIsUploadOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
-                                    <i className="fa-solid fa-cloud-arrow-up mr-2"></i> Upload
-                                </button>
-                                <div className="relative group cursor-pointer">
-                                    <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all shadow-sm">
-                                        <i className="fa-solid fa-bell"></i>
-                                        {currentUser.notifications.length > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>}
+                                {subTab && (
+                                    <div className="bg-slate-100 p-1 rounded-2xl flex gap-1 shadow-inner">
+                                        <button onClick={() => setViewMode('curriculum')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'curriculum' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Curriculum</button>
+                                        <button onClick={() => setViewMode('shared')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'shared' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Resources</button>
+                                        <button onClick={() => setViewMode('assessments')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'assessments' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Assessments</button>
                                     </div>
-                                    <div className="absolute top-full right-0 mt-4 w-80 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-6 hidden group-hover:block animate-in">
-                                        <p className="text-[10px] font-black uppercase text-indigo-500 mb-4 tracking-widest">Recent Activity</p>
-                                        <div className="space-y-4 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                                            {currentUser.notifications.length === 0 ? <p className="text-xs text-slate-400">All caught up!</p> :
-                                                currentUser.notifications.map(n => (
-                                                    <div key={n.id} className="p-3 bg-slate-50 rounded-2xl">
-                                                        <p className="text-[10px] font-black text-slate-800">{n.title}</p>
-                                                        <p className="text-[9px] text-slate-500 leading-tight">{n.message}</p>
-                                                    </div>
-                                                ))
-                                            }
-                                        </div>
-                                    </div>
-                                </div>
+                                )}
+                                <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs shadow-lg">S</div>
                             </div>
                         </header>
 
                         <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
                             {activeTab === 'dashboard' ? (
-                                <div className="space-y-10 animate-in">
-                                    <div className="mesh-bg rounded-[4rem] p-16 text-white shadow-2xl relative overflow-hidden">
-                                        <div className="mesh-circle"></div>
-                                        <h1 className="text-5xl font-black relative z-10 tracking-tighter leading-none">Global Excellence Network</h1>
-                                        <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-[0.5em]">Humanities Hub 2.0</p>
-                                    </div>
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                        <div className="lg:col-span-2 space-y-8">
-                                            <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm relative overflow-hidden">
-                                                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Foundation Newsfeed</h3>
-                                                <div className="space-y-4">
-                                                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
-                                                        <p className="text-sm font-bold text-slate-800">Welcome to the 2026 Academic Portal</p>
-                                                        <p className="text-xs text-slate-500 mt-2">The centralized hub for History, Geography, and Social Sciences is now live.</p>
-                                                    </div>
-                                                </div>
-                                            </section>
-                                        </div>
-                                        <section className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl h-fit">
-                                            <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Upcoming Network Dates</h3>
-                                            <div className="space-y-6">
-                                                <div className="border-l-2 border-indigo-500 pl-4">
-                                                    <p className="text-[11px] font-black text-indigo-300 uppercase">Jan 22, 2026</p>
-                                                    <p className="text-sm font-bold">IGCSE History Moderation</p>
-                                                </div>
-                                            </div>
-                                        </section>
-                                    </div>
+                                <div className="p-16 mesh-bg rounded-[4rem] text-white shadow-2xl relative overflow-hidden">
+                                    <div className="mesh-circle"></div>
+                                    <h1 className="text-5xl font-black relative z-10 tracking-tighter">Humanities Network Hub</h1>
+                                    <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-widest">Accessing Global Curriculum Standards</p>
                                 </div>
                             ) : subTab ? (
-                                <div className="space-y-8 animate-in">
-                                    <div className="flex items-center justify-between bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-                                        <div>
-                                            <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter leading-none">{subTab} Repository</h3>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{activeTab} Curriculum</p>
-                                        </div>
-                                        <button className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-colors">
-                                            <i className="fa-solid fa-bell"></i> Subscribe to Folder
-                                        </button>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {resources.filter(r => r.title.toLowerCase().includes(searchTerm.toLowerCase())).map(res => (
-                                            <ResourceCard key={res.id} resource={res} onClick={() => {}} />
-                                        ))}
-                                    </div>
-                                </div>
+                                viewMode === 'curriculum' ? (
+                                    <CurriculumView activeYear={subTab} isAdmin={currentUser.role === 'ADMIN'} />
+                                ) : (
+                                    <ResourceRepo type={viewMode === 'shared' ? 'shared_resources' : 'assessments'} activeTab={activeTab} subTab={subTab} userData={currentUser} />
+                                )
                             ) : null}
                         </main>
                     </div>
-
-                    <UploadModal 
-                        isOpen={isUploadOpen} 
-                        onClose={() => setIsUploadOpen(false)} 
-                        userData={currentUser} 
-                        activeTab={activeTab} 
-                        subTab={subTab} 
-                        addNotification={addNotification}
-                    />
-                    <AIAssistant />
                 </div>
             );
         };
-
-        const AIAssistant = () => (
-            <button className="fixed bottom-10 right-10 w-16 h-16 bg-slate-900 text-white rounded-full flex items-center justify-center text-xl shadow-2xl hover:scale-110 transition-transform z-50 group">
-                <i className="fa-solid fa-robot"></i>
-                <div className="absolute right-full mr-4 bg-white p-4 rounded-2xl shadow-xl w-64 hidden group-hover:block animate-in">
-                    <p className="text-[10px] font-black uppercase text-indigo-500 mb-2">Network AI</p>
-                    <p className="text-xs text-slate-600 leading-tight">I can help you analyze syllabus changes or locate specific network resources.</p>
-                </div>
-            </button>
-        );
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
