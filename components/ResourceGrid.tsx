@@ -60,14 +60,15 @@ const ResourceGrid: React.FC<ResourceGridProps> = ({
               key={res.id} 
               onClick={() => onResourceClick(res)}
               className={`group bg-white rounded-[2rem] p-6 border shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col h-full ${
-                res.type === ResourceType.COURSEWORK ? 'border-amber-100' : 'border-slate-100'
+                res.type === ResourceType.EXAM_PACKAGE || res.type === ResourceType.COURSEWORK || res.type === ResourceType.INTERNAL_ASSESSMENT ? 'border-amber-100' : 'border-slate-100'
               }`}
             >
               <div className="flex justify-between items-start mb-4">
                 <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
                   res.type === ResourceType.ASSESSMENT ? 'bg-rose-100 text-rose-600' : 
                   res.type === ResourceType.LESSON_PLAN ? 'bg-emerald-100 text-emerald-600' : 
-                  res.type === ResourceType.COURSEWORK ? 'bg-amber-100 text-amber-600' :
+                  res.type === ResourceType.EXAM_PACKAGE ? 'bg-amber-500 text-white' :
+                  res.type === ResourceType.COURSEWORK || res.type === ResourceType.INTERNAL_ASSESSMENT ? 'bg-amber-100 text-amber-600' :
                   'bg-indigo-100 text-indigo-600'
                 }`}>
                   {res.type}
@@ -81,6 +82,16 @@ const ResourceGrid: React.FC<ResourceGridProps> = ({
               <h3 className="font-black text-lg text-slate-800 mb-2 leading-tight group-hover:text-indigo-600 transition-colors">
                 {res.title}
               </h3>
+              
+              {res.examPaper && (
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[9px] font-black bg-slate-900 text-white px-2 py-0.5 rounded uppercase flex items-center gap-1.5">
+                    <i className="fa-solid fa-file-pen"></i>
+                    {res.examPaper}
+                  </span>
+                </div>
+              )}
+
               <p className="text-slate-500 text-sm mb-4 line-clamp-2 flex-1">{res.description}</p>
               
               <div className="flex flex-wrap gap-1 mb-6">

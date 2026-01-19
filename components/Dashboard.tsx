@@ -1,17 +1,30 @@
 
 import React from 'react';
-import { Resource, ForumPost, User, ResourceStatus } from '../types';
+import { Resource, ForumPost, User, ResourceStatus, CalendarEvent, ResourceType } from '../types';
 
 interface DashboardProps {
   resources: Resource[];
   posts: ForumPost[];
+  calendarEvents: CalendarEvent[];
   isAdmin?: boolean;
   currentUser: User;
   onUserClick?: (name: string) => void;
   onResourceClick?: (resource: Resource) => void;
+  onEventClick?: (event: CalendarEvent) => void;
+  globalSearchTerm?: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ resources, posts, isAdmin, currentUser, onUserClick, onResourceClick }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  resources, 
+  posts, 
+  calendarEvents,
+  isAdmin, 
+  currentUser, 
+  onUserClick, 
+  onResourceClick,
+  onEventClick,
+  globalSearchTerm = ''
+}) => {
   const stats = [
     { label: 'Verified Resources', value: resources.filter(r => r.status === ResourceStatus.APPROVED).length, icon: 'fa-file-lines', color: 'bg-blue-500' },
     { label: 'Downloads', value: resources.reduce((acc, curr) => acc + curr.downloads, 0), icon: 'fa-download', color: 'bg-emerald-500' },
@@ -19,8 +32,34 @@ const Dashboard: React.FC<DashboardProps> = ({ resources, posts, isAdmin, curren
     { label: 'Active Staff', value: '14', icon: 'fa-users', color: 'bg-indigo-500' },
   ];
 
-  const subscribedResources = resources.filter(r => currentUser.subscriptions.includes(r.subject) && r.status === ResourceStatus.APPROVED);
-  const myPendingSubmissions = resources.filter(r => r.author === currentUser.name && r.status === ResourceStatus.PENDING);
+  const searchFilter = (item: Resource | ForumPost) => {
+    if (!globalSearchTerm) return true;
+    const term = globalSearchTerm.toLowerCase();
+    const title = 'title' in item ? item.title.toLowerCase() : '';
+    const desc = 'description' in item ? item.description.toLowerCase() : '';
+    const tags = 'tags' in item ? item.tags.join(' ').toLowerCase() : '';
+    const content = 'content' in item ? item.content.toLowerCase() : '';
+    return title.includes(term) || desc.includes(term) || tags.includes(term) || content.includes(term);
+  };
+
+  // On the dashboard, we only show notifications for subjects they subscribe to or professional development.
+  const relevantResources = resources.filter(r => 
+    (currentUser.subscriptions.includes(r.subject) || 
+     currentUser.subscriptions.includes(r.yearGroup) || 
+     r.type === ResourceType.PROFESSIONAL_DEVELOPMENT) && 
+    r.status === ResourceStatus.APPROVED &&
+    searchFilter(r)
+  );
+
+  const relevantPosts = posts.filter(p => 
+    ((p.subject && currentUser.subscriptions.includes(p.subject)) || 
+     (p.yearGroup && currentUser.subscriptions.includes(p.yearGroup))) &&
+    searchFilter(p)
+  );
+
+  const today = new Date();
+  const currentMonth = today.toLocaleString('default', { month: 'long' });
+  const currentYear = today.getFullYear();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -40,164 +79,168 @@ const Dashboard: React.FC<DashboardProps> = ({ resources, posts, isAdmin, curren
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* Submissions in Queue (Personal Feedback) */}
-          {!isAdmin && myPendingSubmissions.length > 0 && (
-            <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100 shadow-sm animate-in slide-in-from-top-4">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-black text-amber-900">Your Submissions Queue</h2>
-                  <p className="text-sm text-amber-600 mt-1">Awaiting approval by Curriculum Officers.</p>
-                </div>
-                <div className="w-10 h-10 bg-amber-200 rounded-full flex items-center justify-center text-amber-700">
-                  <i className="fa-solid fa-hourglass-half"></i>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {myPendingSubmissions.map(res => (
-                  <div 
-                    key={res.id} 
-                    onClick={() => onResourceClick?.(res)}
-                    className="flex items-center justify-between p-4 bg-white/80 rounded-2xl border border-amber-200 hover:bg-white transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-amber-400 text-white flex items-center justify-center text-xs">
-                        <i className="fa-solid fa-file-pen"></i>
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800 group-hover:text-amber-700">{res.title}</p>
-                        <p className="text-[10px] text-amber-500 font-black uppercase tracking-tighter">{res.subject} • Submitted {res.date}</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-black uppercase bg-amber-100 text-amber-700 px-3 py-1 rounded-lg">Review Pending</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-2xl font-black text-slate-800">Your Notified Subjects</h2>
-                <p className="text-sm text-slate-400 mt-1">Activity from subjects you've subscribed to.</p>
+                <h2 className="text-2xl font-black text-slate-800">Your Activity Feed</h2>
+                <p className="text-sm text-slate-400 mt-1">Focused on followed subjects and Professional Development.</p>
               </div>
               <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500">
                 <i className="fa-solid fa-bell"></i>
               </div>
             </div>
 
-            {currentUser.subscriptions.length === 0 ? (
+            {currentUser.subscriptions.length === 0 && relevantResources.filter(r => r.type === ResourceType.PROFESSIONAL_DEVELOPMENT).length === 0 ? (
               <div className="text-center py-10 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl">
-                <p className="text-slate-500 text-sm italic">You haven't subscribed to any subjects yet.</p>
-                <p className="text-[10px] text-slate-400 font-bold uppercase mt-2">Go to a Year Group and click "Receive notifications" to stay updated.</p>
+                <p className="text-slate-500 text-sm italic">You aren't following any sub-hubs yet.</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase mt-2">Visit a Subject or Year Group and click the bell icon to receive notifications here.</p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2 mb-6">
-                {currentUser.subscriptions.map(subject => (
-                  <span key={subject} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black uppercase tracking-wider border border-indigo-100">
-                    {subject}
+                {currentUser.subscriptions.map(sub => (
+                  <span key={sub} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black uppercase tracking-wider border border-indigo-100">
+                    {sub}
                   </span>
                 ))}
+                <span className="px-4 py-2 bg-violet-50 text-violet-600 rounded-xl text-xs font-black uppercase tracking-wider border border-violet-100">
+                  Professional Development
+                </span>
               </div>
             )}
 
-            {subscribedResources.length > 0 && (
-              <div className="space-y-3 mt-6">
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Latest from your subjects</p>
-                {subscribedResources.slice(0, 3).map(res => (
-                  <div 
-                    key={res.id} 
-                    onClick={() => onResourceClick?.(res)}
-                    className="flex items-center justify-between p-4 bg-indigo-50/30 rounded-2xl border border-indigo-100 hover:bg-white transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-500 text-white flex items-center justify-center text-xs">
-                        <i className="fa-solid fa-file-invoice"></i>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              {/* Latest Relevant Resources */}
+              <div className="space-y-4">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2 flex items-center gap-2">
+                  <i className="fa-solid fa-file-invoice text-indigo-400"></i> Relevant Uploads
+                </p>
+                {relevantResources.length > 0 ? (
+                  relevantResources.slice(0, 5).map(res => (
+                    <div 
+                      key={res.id} 
+                      onClick={() => onResourceClick?.(res)}
+                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group ${
+                        res.type === ResourceType.PROFESSIONAL_DEVELOPMENT 
+                        ? 'bg-violet-50/30 border-violet-100 hover:bg-white' 
+                        : 'bg-indigo-50/30 border-indigo-100 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 truncate">{res.title}</p>
+                        <p className={`text-[10px] font-black uppercase tracking-tighter ${
+                          res.type === ResourceType.PROFESSIONAL_DEVELOPMENT ? 'text-violet-400' : 'text-indigo-400'
+                        }`}>
+                          {res.type === ResourceType.PROFESSIONAL_DEVELOPMENT ? 'PD Hub' : res.subject} • {res.date}
+                        </p>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800 group-hover:text-indigo-600">{res.title}</p>
-                        <p className="text-[10px] text-indigo-400 font-black uppercase tracking-tighter">{res.subject} • {res.date}</p>
-                      </div>
+                      <i className="fa-solid fa-chevron-right text-slate-300 group-hover:translate-x-1 transition-transform ml-2"></i>
                     </div>
-                    <i className="fa-solid fa-chevron-right text-slate-300 group-hover:translate-x-1 transition-transform"></i>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400 italic py-4">No recent activity in followed areas.</p>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-2xl font-black text-slate-800">Latest Shared Resources</h2>
-                <p className="text-sm text-slate-400 mt-1">Verified community contributions.</p>
-              </div>
-              <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500">
-                <i className="fa-solid fa-circle-check"></i>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              {resources.filter(r => r.status === ResourceStatus.APPROVED).length === 0 ? (
-                <p className="text-slate-400 text-sm italic text-center py-8">No approved resources yet.</p>
-              ) : (
-                resources.filter(r => r.status === ResourceStatus.APPROVED).slice(0, 5).map(res => (
-                  <div 
-                    key={res.id} 
-                    onClick={() => onResourceClick?.(res)}
-                    className="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="bg-white w-11 h-11 rounded-full flex items-center justify-center text-indigo-500 shadow-sm border border-slate-200 group-hover:text-white group-hover:bg-indigo-500 transition-colors shrink-0">
-                        <i className="fa-solid fa-file-lines text-sm"></i>
+              {/* Latest Relevant Forum Posts */}
+              <div className="space-y-4">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2 flex items-center gap-2">
+                  <i className="fa-solid fa-comments text-emerald-400"></i> Relevant Conversations
+                </p>
+                {relevantPosts.length > 0 ? (
+                  relevantPosts.slice(0, 5).map(post => (
+                    <div 
+                      key={post.id} 
+                      className="flex items-center justify-between p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100 hover:bg-white transition-all cursor-pointer group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 group-hover:text-emerald-600 truncate">{post.title}</p>
+                        <p className="text-[10px] text-emerald-400 font-black uppercase tracking-tighter">
+                          {post.subject || post.yearGroup} • {post.replies.length} replies
+                        </p>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{res.title}</p>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); onUserClick?.(res.author); }}
-                            className="text-[10px] text-slate-400 font-bold uppercase tracking-tight hover:text-indigo-500 transition-colors"
-                          >
-                            {res.author}
-                          </button>
-                          <span className="text-[10px] text-slate-300">•</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{res.date}</span>
-                        </div>
-                      </div>
+                      <i className="fa-solid fa-chevron-right text-slate-300 group-hover:translate-x-1 transition-transform ml-2"></i>
                     </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span className="bg-white px-3 py-1 rounded-full text-[10px] font-black text-slate-500 border border-slate-200 uppercase tracking-tighter">
-                        {res.type}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400 italic py-4">No recent discussions in followed areas.</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         <div className="space-y-6">
+          {/* Staff Calendar Section */}
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <i className="fa-solid fa-calendar-day text-indigo-600"></i>
+                Staff Calendar
+              </h3>
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                {currentMonth} {currentYear}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              {calendarEvents.map(event => (
+                <div 
+                  key={event.id}
+                  onClick={() => onEventClick?.(event)}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer hover:shadow-lg active:scale-95 ${
+                    event.type === 'pd' 
+                      ? 'bg-indigo-50 border-indigo-100 hover:border-indigo-500' 
+                      : 'bg-rose-50 border-rose-100 hover:border-rose-500'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+                      event.type === 'pd' ? 'bg-indigo-600 text-white' : 'bg-rose-600 text-white'
+                    }`}>
+                      {event.type === 'pd' ? 'PD Session' : 'Deadline'}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">{event.date}</span>
+                  </div>
+                  <h4 className="text-sm font-black text-slate-800 leading-tight">
+                    {event.title}
+                  </h4>
+                  {event.type === 'pd' && (
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">Click to View & Sign Up</span>
+                      <i className="fa-solid fa-arrow-right text-[10px] text-indigo-400"></i>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-slate-100">
+              <p className="text-[9px] font-bold text-slate-400 text-center uppercase tracking-widest">
+                Check PD Hub for more sessions
+              </p>
+            </div>
+          </div>
+
           <div className="bg-indigo-600 p-8 rounded-[2.5rem] shadow-xl shadow-indigo-100 text-white relative overflow-hidden h-fit flex flex-col">
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <i className="fa-solid fa-bullhorn text-indigo-200"></i>
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Department Feed</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Department Alerts</span>
                 </div>
               </div>
-              <h2 className="text-2xl font-black mb-4 leading-tight">YCYW Notices</h2>
+              <h2 className="text-2xl font-black mb-4 leading-tight">Foundation Feed</h2>
               <div className="bg-white/10 backdrop-blur-sm p-5 rounded-2xl mb-6 border border-white/10 space-y-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="bg-emerald-500 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">New Rule</span>
+                    <span className="bg-emerald-500 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Announcements</span>
                     <span className="text-[9px] font-bold opacity-60">Just now</span>
                   </div>
-                  <p className="text-sm font-medium leading-relaxed text-indigo-50">All shared files now require Curriclum Officer verification for security.</p>
+                  <p className="text-sm font-medium leading-relaxed text-indigo-50">Sharing resources helps all our teachers grow! All uploads are instantly live.</p>
                 </div>
                 <div className="pt-4 border-t border-white/10">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="bg-indigo-400 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Notice</span>
+                    <span className="bg-indigo-400 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Curriculum Update</span>
                     <span className="text-[9px] font-bold opacity-60">Today</span>
                   </div>
                   <p className="text-sm font-medium leading-relaxed text-indigo-50">Please use the discussion boards for moderation questions.</p>

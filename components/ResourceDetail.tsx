@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Resource, ResourceComment, User, ResourceFile, UserRole, ResourceType, ResourceStatus } from '../types';
+import { Resource, ResourceComment, User, ResourceFile, UserRole, ResourceType } from '../types';
 
 interface ResourceDetailProps {
   resource: Resource;
@@ -18,19 +18,18 @@ const ResourceDetail: React.FC<ResourceDetailProps> = ({
   onClose, 
   onAddComment, 
   onAddFiles, 
-  onApproveResource,
   onDeleteResource,
   currentUser, 
   onUserClick 
 }) => {
   const [newComment, setNewComment] = useState('');
   const [isQuestion, setIsQuestion] = useState(false);
+  const [isSignedUp, setIsSignedUp] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = currentUser.role === UserRole.ADMIN;
   const isAuthor = currentUser.name === resource.author;
   const canModifyFiles = isAuthor || isAdmin;
-  const isPending = resource.status === ResourceStatus.PENDING;
 
   const handleSubmitComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +62,19 @@ const ResourceDetail: React.FC<ResourceDetailProps> = ({
   };
 
   const handleDownload = (fileName: string) => {
-    alert(`Downloading ${fileName}... This would trigger a secure fetch of the actual file blob in a production environment.`);
+    alert(`Downloading ${fileName}...`);
+  };
+
+  const handleSignUp = () => {
+    setIsSignedUp(true);
+    // Mock signup action: Add a comment automatically
+    const comment: ResourceComment = {
+      id: Math.random().toString(36).substr(2, 9),
+      author: currentUser.name,
+      content: "I've signed up for this Professional Development session! Looking forward to it.",
+      date: 'Just now'
+    };
+    onAddComment(resource.id, comment);
   };
 
   return (
@@ -75,16 +86,17 @@ const ResourceDetail: React.FC<ResourceDetailProps> = ({
           </button>
           <div className="flex flex-col items-center text-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
-              {resource.type === ResourceType.COURSEWORK ? 'Moderation Hub' : 'Resource Collection'}
+              {resource.type === ResourceType.EXAM_PACKAGE ? 'Exam Package' : 
+               resource.type === ResourceType.PROFESSIONAL_DEVELOPMENT ? 'PD Hub' : 'Resource Hub'}
             </span>
             <span className="text-[9px] font-bold text-indigo-500 uppercase mt-1 tracking-tighter">{resource.yearGroup} • {resource.subject}</span>
           </div>
           <div className="flex gap-2">
-            {isAdmin && (
+            {(isAdmin || isAuthor) && (
               <button 
                 onClick={() => onDeleteResource(resource.id)}
                 className="p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-colors"
-                title="Admin Delete"
+                title="Delete Resource"
               >
                 <i className="fa-solid fa-trash-can"></i>
               </button>
@@ -93,49 +105,59 @@ const ResourceDetail: React.FC<ResourceDetailProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
-          {isPending && (
-            <div className="bg-amber-50 border border-amber-200 rounded-[2rem] p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in slide-in-from-top-2">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-200 text-amber-700 rounded-full flex items-center justify-center">
-                  <i className="fa-solid fa-clock-rotate-left"></i>
-                </div>
-                <div>
-                  <p className="text-sm font-black text-amber-800 uppercase tracking-tight">Pending Approval</p>
-                  <p className="text-[10px] text-amber-600 font-bold uppercase tracking-widest">This resource is not yet visible to the public.</p>
-                </div>
-              </div>
-              {isAdmin && (
+          <header>
+            <div className="flex items-center justify-between mb-4">
+              <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full shadow-sm ${
+                resource.type === ResourceType.ASSESSMENT ? 'bg-rose-100 text-rose-600' : 
+                resource.type === ResourceType.LESSON_PLAN ? 'bg-emerald-100 text-emerald-600' : 
+                resource.type === ResourceType.EXAM_PACKAGE ? 'bg-amber-500 text-white' :
+                resource.type === ResourceType.COURSEWORK || resource.type === ResourceType.INTERNAL_ASSESSMENT ? 'bg-amber-100 text-amber-600' :
+                resource.type === ResourceType.PROFESSIONAL_DEVELOPMENT ? 'bg-violet-600 text-white' :
+                'bg-indigo-100 text-indigo-600'
+              }`}>
+                {resource.type}
+              </span>
+              {resource.type === ResourceType.PROFESSIONAL_DEVELOPMENT && (
                 <button 
-                  onClick={() => onApproveResource(resource.id)}
-                  className="bg-emerald-500 text-white px-6 py-2 rounded-xl font-black text-xs hover:bg-emerald-600 transition-all shadow-lg active:scale-95"
+                  disabled={isSignedUp}
+                  onClick={handleSignUp}
+                  className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all shadow-md active:scale-95 ${
+                    isSignedUp ? 'bg-emerald-50 text-emerald-600' : 'bg-violet-600 text-white hover:bg-violet-700'
+                  }`}
                 >
-                  Approve Resource
+                  {isSignedUp ? <><i className="fa-solid fa-check mr-2"></i>Signed Up</> : 'Sign Up for Session'}
                 </button>
               )}
             </div>
-          )}
-
-          <header>
-            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full mb-2 inline-block ${
-              resource.type === ResourceType.ASSESSMENT ? 'bg-rose-100 text-rose-600' : 
-              resource.type === ResourceType.LESSON_PLAN ? 'bg-emerald-100 text-emerald-600' : 
-              resource.type === ResourceType.COURSEWORK ? 'bg-amber-100 text-amber-600' :
-              'bg-indigo-100 text-indigo-600'
-            }`}>
-              {resource.type}
-            </span>
+            
             <h2 className="text-3xl font-black text-slate-800 mb-4 leading-tight">{resource.title}</h2>
-            <p className="text-slate-600 leading-relaxed mb-6 text-sm italic">{resource.description}</p>
+            
+            {resource.examPaper && (
+              <div className="bg-slate-900 p-4 rounded-2xl mb-6 flex items-center gap-4 text-white">
+                <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center text-xl">
+                  <i className="fa-solid fa-file-signature"></i>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-300">Exam Identifier</p>
+                  <p className="text-sm font-black uppercase tracking-widest">{resource.examPaper}</p>
+                </div>
+                <div className="ml-auto bg-white/10 px-3 py-1 rounded-lg border border-white/10">
+                  <span className="text-[10px] font-black uppercase">Standard Verified</span>
+                </div>
+              </div>
+            )}
+
+            <p className="text-slate-600 leading-relaxed mb-6 text-sm font-medium">{resource.description}</p>
             
             <button 
               onClick={() => onUserClick?.(resource.author)}
-              className={`flex items-center gap-3 p-4 rounded-2xl mb-8 border w-full text-left transition-all ${resource.type === ResourceType.COURSEWORK ? 'bg-amber-50 border-amber-100 hover:bg-amber-100' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
+              className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl mb-8 w-full text-left transition-all hover:bg-slate-100"
             >
               <div className="w-10 h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center text-xs font-black text-slate-400 shadow-sm overflow-hidden shrink-0">
                 {resource.author[0]}
               </div>
               <div className="flex-1">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Contributor</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Staff Contributor</p>
                 <p className="text-sm font-bold text-slate-700">{resource.author}</p>
               </div>
               <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold">
@@ -148,8 +170,8 @@ const ResourceDetail: React.FC<ResourceDetailProps> = ({
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                <i className={`fa-solid ${resource.type === ResourceType.COURSEWORK ? 'fa-file-shield text-amber-500' : 'fa-paperclip text-indigo-400'}`}></i>
-                {resource.type === ResourceType.COURSEWORK ? 'Moderation Samples' : 'Resource Files'}
+                <i className={`fa-solid ${resource.type === ResourceType.EXAM_PACKAGE ? 'fa-box-archive text-amber-500' : 'fa-paperclip text-indigo-400'}`}></i>
+                {resource.type === ResourceType.EXAM_PACKAGE ? 'Exam Paper & Mark Scheme' : 'Attached Files'}
               </h3>
               {canModifyFiles && (
                 <>
@@ -181,56 +203,38 @@ const ResourceDetail: React.FC<ResourceDetailProps> = ({
             </div>
           </section>
 
-          <section className="space-y-6 pt-8 border-t border-slate-100">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-black text-slate-800">
-                Community Discussion
-              </h3>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{resource.comments.length} Messages</span>
-            </div>
-
+          <section className="space-y-6 pt-8 border-t border-slate-100 pb-20">
+            <h3 className="text-lg font-black text-slate-800">Staff Discussion</h3>
             <form onSubmit={handleSubmitComment} className="space-y-3">
               <div className="relative">
-                <textarea className="w-full bg-slate-50 border-2 border-slate-100 rounded-[2rem] p-6 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 h-32 transition-all shadow-inner" placeholder="Share your feedback or ask a question about this resource..." value={newComment} onChange={e => setNewComment(e.target.value)}></textarea>
+                <textarea className="w-full bg-slate-50 border-2 border-slate-100 rounded-[2rem] p-6 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 h-32 transition-all shadow-inner" placeholder="Ask about moderation or content queries..." value={newComment} onChange={e => setNewComment(e.target.value)}></textarea>
                 <div className="absolute bottom-4 right-4 flex items-center gap-3">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" checked={isQuestion} onChange={e => setIsQuestion(e.target.checked)} />
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Question?</span>
+                    <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600" checked={isQuestion} onChange={e => setIsQuestion(e.target.checked)} />
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Question?</span>
                   </label>
-                  <button type="submit" className="bg-indigo-600 text-white p-2 w-12 h-12 rounded-2xl hover:bg-indigo-700 transition-colors shadow-lg active:scale-90"><i className="fa-solid fa-paper-plane"></i></button>
+                  <button type="submit" className="bg-indigo-600 text-white p-2 w-12 h-12 rounded-2xl shadow-lg active:scale-90 transition-all"><i className="fa-solid fa-paper-plane"></i></button>
                 </div>
               </div>
             </form>
 
             <div className="space-y-4">
-              {resource.comments.length === 0 ? (
-                <div className="text-center py-10 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No comments yet</p>
-                </div>
-              ) : (
-                resource.comments.map(c => (
-                  <div key={c.id} className={`p-6 rounded-[2rem] border ${c.isQuestion ? 'bg-amber-50/50 border-amber-100 shadow-sm' : 'bg-white border-slate-100'}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <button 
-                        onClick={() => onUserClick?.(c.author)}
-                        className="flex items-center gap-2 text-left group"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-[10px] font-black text-indigo-300 overflow-hidden shrink-0 group-hover:bg-indigo-100 transition-colors">
-                          {c.author[0]}
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-slate-700 group-hover:text-indigo-600 transition-colors">{c.author}</p>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{c.date}</p>
-                        </div>
-                      </button>
-                      {c.isQuestion && (
-                        <span className="bg-amber-100 text-amber-600 text-[10px] font-black uppercase px-2 py-0.5 rounded">Question</span>
-                      )}
+              {resource.comments.map(c => (
+                <div key={c.id} className={`p-6 rounded-[2rem] border ${c.isQuestion ? 'bg-amber-50/50 border-amber-100' : 'bg-white border-slate-100'}`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-[10px] font-black text-indigo-300 overflow-hidden shrink-0">
+                        {c.author[0]}
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-slate-700">{c.author}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{c.date}</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-slate-600 leading-relaxed font-medium">{c.content}</p>
                   </div>
-                ))
-              )}
+                  <p className="text-sm text-slate-600 font-medium">{c.content}</p>
+                </div>
+              ))}
             </div>
           </section>
         </div>

@@ -6,19 +6,21 @@ import ResourceGrid from './ResourceGrid';
 interface PDViewProps {
   resources: Resource[];
   onResourceClick: (resource: Resource) => void;
+  globalSearchTerm?: string;
 }
 
 const PD_TAGS = ['Pedagogy', 'AI & Tech', 'Wellbeing', 'Leadership', 'Assessment', 'EAL'];
 
-const PDView: React.FC<PDViewProps> = ({ resources, onResourceClick }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+const PDView: React.FC<PDViewProps> = ({ resources, onResourceClick, globalSearchTerm = '' }) => {
   const [activeTag, setActiveTag] = useState('All');
 
+  const term = globalSearchTerm.toLowerCase();
   const pdResources = resources.filter(res => 
     res.type === ResourceType.PROFESSIONAL_DEVELOPMENT &&
-    (searchTerm === '' || 
-      res.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      res.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()))) &&
+    (globalSearchTerm === '' || 
+      res.title.toLowerCase().includes(term) || 
+      res.tags.some(t => t.toLowerCase().includes(term)) ||
+      res.description.toLowerCase().includes(term)) &&
     (activeTag === 'All' || res.tags.includes(activeTag))
   );
 
@@ -59,16 +61,12 @@ const PDView: React.FC<PDViewProps> = ({ resources, onResourceClick }) => {
           <h3 className="text-2xl font-black text-slate-800">Learning Resources</h3>
           <p className="text-sm text-slate-400 font-medium">Browse shared expertise and workshop materials.</p>
         </div>
-        <div className="relative w-full md:w-96">
-          <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-          <input 
-            type="text" 
-            placeholder="Search PD resources..." 
-            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        {globalSearchTerm && (
+          <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl flex items-center gap-2">
+            <i className="fa-solid fa-magnifying-glass text-indigo-400 text-xs"></i>
+            <span className="text-xs font-bold text-indigo-600 italic">Filtering for: "{globalSearchTerm}"</span>
+          </div>
+        )}
       </div>
 
       <ResourceGrid 

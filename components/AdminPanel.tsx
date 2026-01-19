@@ -10,10 +10,23 @@ interface AdminPanelProps {
   onApproveUser: (id: string, role: UserRole) => void;
   schoolLogo: string | null;
   onUpdateLogo: (logo: string | null) => void;
+  appName: string;
+  onUpdateAppName: (name: string) => void;
   onUserClick?: (name: string) => void;
 }
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ resources, users, onApproveResource, onDeleteResource, onApproveUser, schoolLogo, onUpdateLogo, onUserClick }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ 
+  resources, 
+  users, 
+  onApproveResource, 
+  onDeleteResource, 
+  onApproveUser, 
+  schoolLogo, 
+  onUpdateLogo, 
+  appName,
+  onUpdateAppName,
+  onUserClick 
+}) => {
   const [selectedRoles, setSelectedRoles] = useState<Record<string, UserRole>>({});
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,12 +107,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ resources, users, onApproveReso
 
         <section className="space-y-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-            <h2 className="text-2xl font-black text-slate-800">School Branding</h2>
+            <h2 className="text-2xl font-black text-slate-800">Platform Branding</h2>
             <i className="fa-solid fa-palette text-slate-300"></i>
           </div>
 
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
-            <div className="flex flex-col items-center gap-6">
+            <div className="space-y-4">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 ml-1">App Name / Department Name</label>
+              <div className="relative group">
+                <i className="fa-solid fa-pen-nib absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors"></i>
+                <input 
+                  type="text" 
+                  value={appName}
+                  onChange={(e) => onUpdateAppName(e.target.value)}
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-3 pl-12 pr-4 text-sm font-black focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                  placeholder="e.g. YCYW Humanities"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-6 pt-4 border-t border-slate-50">
               <div className={`w-32 h-32 rounded-[2rem] flex items-center justify-center shadow-inner overflow-hidden border-4 border-slate-50 ${schoolLogo ? 'bg-white' : 'bg-indigo-500 text-white'}`}>
                 {schoolLogo ? (
                   <img src={schoolLogo} alt="Current School Logo" className="w-full h-full object-contain p-2" />
@@ -109,8 +136,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ resources, users, onApproveReso
               </div>
               
               <div className="text-center">
-                <h4 className="font-black text-slate-800">Department Identity</h4>
-                <p className="text-xs text-slate-500 mt-1">Upload your school logo to personalize the portal.</p>
+                <h4 className="font-black text-slate-800">Department Identity Logo</h4>
+                <p className="text-xs text-slate-500 mt-1">Upload your logo to update the sidebar and portal header.</p>
               </div>
 
               <div className="flex flex-col w-full gap-3">
@@ -142,64 +169,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ resources, users, onApproveReso
         </section>
       </div>
 
-      <section className="space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-          <h2 className="text-2xl font-black text-slate-800">Resource Moderation Queue</h2>
-          <span className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-xs font-black uppercase">
-            {resources.length} Review Needed
-          </span>
-        </div>
-
-        {resources.length === 0 ? (
-          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center">
-            <i className="fa-solid fa-check-double text-slate-300 text-4xl mb-4"></i>
-            <p className="text-slate-500 font-bold uppercase text-xs tracking-widest">Queue Clear</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {resources.map(res => (
-              <div key={res.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition-all">
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded">
-                      {res.type}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">{res.yearGroup}</span>
-                  </div>
-                  <h4 className="text-lg font-black text-slate-800 leading-tight">{res.title}</h4>
-                  <p className="text-sm text-slate-500 line-clamp-1 italic">{res.description}</p>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => onUserClick?.(res.author)}
-                      className="text-[10px] text-indigo-600 font-black uppercase tracking-tight hover:underline"
-                    >
-                      Uploaded by {res.author}
-                    </button>
-                    <span className="text-[10px] text-slate-300">•</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">{res.date}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => onDeleteResource(res.id)}
-                    className="flex items-center gap-2 px-4 py-3 bg-rose-50 text-rose-600 rounded-2xl font-black text-xs hover:bg-rose-100 transition-all"
-                  >
-                    <i className="fa-solid fa-trash"></i>
-                    Reject & Delete
-                  </button>
-                  <button 
-                    onClick={() => onApproveResource(res.id)}
-                    className="flex items-center gap-2 bg-emerald-500 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-xl shadow-emerald-100 hover:bg-emerald-600 active:scale-95 transition-all"
-                  >
-                    <i className="fa-solid fa-check"></i>
-                    Approve Resource
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <div className="p-12 text-center bg-white rounded-[3rem] border border-slate-100 shadow-sm">
+        <i className="fa-solid fa-bolt-lightning text-amber-400 text-4xl mb-4"></i>
+        <h3 className="text-xl font-black text-slate-800">Instant Publishing is Active</h3>
+        <p className="text-sm text-slate-500 max-w-md mx-auto mt-2">All staff resources are now published immediately to the platform to foster rapid collaboration and sharing within the humanities department.</p>
+      </div>
     </div>
   );
 };

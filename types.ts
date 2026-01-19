@@ -35,6 +35,12 @@ export interface User {
 }
 
 export enum YearGroup {
+  YEAR_1 = 'Year 1',
+  YEAR_2 = 'Year 2',
+  YEAR_3 = 'Year 3',
+  YEAR_4 = 'Year 4',
+  YEAR_5 = 'Year 5',
+  YEAR_6 = 'Year 6',
   YEAR_7 = 'Year 7',
   YEAR_8 = 'Year 8',
   YEAR_9 = 'Year 9',
@@ -47,11 +53,12 @@ export enum YearGroup {
 }
 
 export enum Subject {
+  YEAR_1_6 = 'Primary Humanities',
   YEAR_7_9 = 'Year 7-9',
   HISTORY = 'History',
   GEOGRAPHY = 'Geography',
   PSYCHOLOGY = 'Psychology',
-  SOCIOLOGY = 'Sociology',
+  SOCIOLOGY = 'SOCIOLOGY',
   ECONOMICS = 'Economics',
   BUSINESS = 'Business',
   ENTERPRISE = 'Enterprise',
@@ -64,9 +71,10 @@ export enum ResourceType {
   LESSON_PLAN = 'Lesson Plan',
   ASSESSMENT = 'Assessment',
   MARK_SCHEME = 'Mark Scheme',
+  EXAM_PACKAGE = 'Exam & Mark Scheme',
   PRESENTATION = 'Presentation',
   WORKSHEET = 'Worksheet',
-  EXAMPLE_WORK = 'Student Example',
+  EXAMPLE_WORK = 'Example Assessment',
   COURSEWORK = 'Coursework',
   INTERNAL_ASSESSMENT = 'Internal Assessment (IA)',
   PROFESSIONAL_DEVELOPMENT = 'Professional Development'
@@ -102,6 +110,15 @@ export interface Resource {
   comments: ResourceComment[];
   status: ResourceStatus;
   files: ResourceFile[];
+  examPaper?: string; // e.g., "Paper 1", "Paper 2"
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string; // ISO string YYYY-MM-DD
+  type: 'pd' | 'deadline';
+  resourceId?: string; // Link to specific PD resource
 }
 
 export interface ForumPost {
