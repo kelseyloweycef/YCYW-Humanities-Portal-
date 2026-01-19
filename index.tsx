@@ -1,30 +1,329 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YCYW Humanities Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; margin: 0; }
+        .mesh-bg { background: linear-gradient(135deg, #4f46e5 0%, #1e293b 100%); position: relative; overflow: hidden; }
+        .mesh-circle { position: absolute; top: -20%; right: -10%; width: 300px; height: 300px; background: #6366f1; border-radius: 50%; filter: blur(80px); opacity: 0.4; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-// Firebase configuration provided by the user
-const firebaseConfig = {
-  apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
-  authDomain: "ycyw-humanities-portal.firebaseapp.com",
-  projectId: "ycyw-humanities-portal",
-  storageBucket: "ycyw-humanities-portal.firebasestorage.app",
-  messagingSenderId: "141054228326",
-  appId: "1:141054228326:web:13248804cf5e407a163aa7",
-  measurementId: "G-NJPT0NP98T"
-};
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, where, updateDoc, addDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// In a production environment, you would typically initialize Firebase here:
-// import { initializeApp } from "firebase/app";
-// const firebaseApp = initializeApp(firebaseConfig);
+        const firebaseConfig = {
+          apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
+          authDomain: "ycyw-humanities-portal.firebaseapp.com",
+          projectId: "ycyw-humanities-portal",
+          storageBucket: "ycyw-humanities-portal.firebasestorage.app",
+          messagingSenderId: "141054228326",
+          appId: "1:141054228326:web:13248804cf5e407a163aa7"
+        };
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
-}
+        const app = initializeApp(firebaseConfig);
+        window.FB = { auth: getAuth(app), db: getFirestore(app), onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, doc, setDoc, getDoc, collection, onSnapshot, query, where, updateDoc, addDoc, serverTimestamp, orderBy };
+    </script>
 
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- SHARED RESOURCES COMPONENT ---
+        const SharedResources = ({ activeTab, subTab, userData }) => {
+            const [resources, setResources] = useState([]);
+            const [isUploading, setIsUploading] = useState(false);
+            const [commentingOn, setCommentingOn] = useState(null);
+            const [newResource, setNewResource] = useState({ title: '', links: '', files: [] });
+
+            const collectionPath = `resources_${activeTab}_${subTab}`.replace(/\s+/g, '_');
+
+            useEffect(() => {
+                const q = window.FB.query(window.FB.collection(window.FB.db, collectionPath), window.FB.orderBy("timestamp", "desc"));
+                return window.FB.onSnapshot(q, (s) => setResources(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+            }, [collectionPath]);
+
+            const handleUpload = async (e) => {
+                e.preventDefault();
+                if (!newResource.title) return;
+                await window.FB.addDoc(window.FB.collection(window.FB.db, collectionPath), {
+                    title: newResource.title,
+                    links: newResource.links.split(',').map(l => l.trim()),
+                    author: userData.name,
+                    authorEmail: userData.email,
+                    timestamp: window.FB.serverTimestamp(),
+                    commentCount: 0
+                });
+                setNewResource({ title: '', links: '', files: [] });
+                setIsUploading(false);
+            };
+
+            return (
+                <div className="space-y-8 animate-in">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Shared Materials</h3>
+                        <button onClick={() => setIsUploading(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">
+                            <i className="fa-solid fa-plus mr-2"></i> Add New Resource
+                        </button>
+                    </div>
+
+                    {isUploading && (
+                        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-100 shadow-xl animate-in">
+                            <form onSubmit={handleUpload} className="space-y-4">
+                                <input placeholder="Resource Title (e.g. Year 8 Migration PPT & Worksheet)" className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-500 font-bold" 
+                                    onChange={e => setNewResource({...newResource, title: e.target.value})} required />
+                                <textarea placeholder="Paste links (comma separated for multiple)" className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-500 text-sm" 
+                                    onChange={e => setNewResource({...newResource, links: e.target.value})} />
+                                <div className="flex gap-2">
+                                    <button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest">Post to Subject</button>
+                                    <button type="button" onClick={() => setIsUploading(false)} className="px-8 bg-slate-100 text-slate-400 rounded-xl font-black uppercase text-xs">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {resources.map(res => (
+                            <div key={res.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:border-indigo-300 transition-all group relative">
+                                <div className="flex justify-between items-start mb-4">
+                                    <h4 className="text-lg font-black text-slate-800 leading-tight">{res.title}</h4>
+                                    <span className="text-[8px] font-black bg-indigo-50 text-indigo-500 px-2 py-1 rounded-md uppercase">{res.author.split(' ')[0]}</span>
+                                </div>
+                                
+                                <div className="space-y-2 mb-6">
+                                    {res.links.map((link, i) => link && (
+                                        <a key={i} href={link} target="_blank" className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-100">
+                                            <i className="fa-solid fa-file-export opacity-40"></i> {link.length > 30 ? link.substring(0,30)+'...' : link}
+                                        </a>
+                                    ))}
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button onClick={() => setCommentingOn(res)} className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-100 hover:bg-indigo-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                                        <i className="fa-solid fa-comment-dots"></i> Discussion
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Discussion Modal */}
+                    {commentingOn && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6" onClick={() => setCommentingOn(null)}>
+                            <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl animate-in flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-xl font-black text-slate-800 mb-6 uppercase tracking-tight">Resource Chat: {commentingOn.title}</h3>
+                                <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                                    <div className="bg-slate-50 p-4 rounded-2xl text-xs text-slate-500 italic">No comments yet. Start the conversation!</div>
+                                </div>
+                                <div className="mt-6 flex gap-2">
+                                    <input placeholder="Ask a question..." className="flex-1 p-4 bg-slate-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    <button className="bg-indigo-600 text-white px-6 rounded-xl"><i className="fa-solid fa-paper-plane"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- (Previous StandardsView Component remains here) ---
+        const StandardsView = ({ activeTab, subTab, isAdmin, userData }) => {
+            const [message, setMessage] = useState('');
+            const factions = [
+                { name: "Past and Present", icon: "fa-history", color: "text-amber-500", bg: "bg-amber-50", topics: ["Silk Road", "Dynastic China", "Heritage"] },
+                { name: "Our Evolving World", icon: "fa-earth-asia", color: "text-emerald-500", bg: "bg-emerald-50", topics: ["Climate", "Tectonics", "Migration"] },
+                { name: "Global Citizenship", icon: "fa-users-rays", color: "text-blue-500", bg: "bg-blue-50", topics: ["Human Rights", "SDGs", "Identity"] },
+                { name: "Economics & Business", icon: "fa-chart-pie", color: "text-indigo-500", bg: "bg-indigo-50", topics: ["Trade", "Financials", "Entrepreneurship"] }
+            ];
+            const isSenior = ['igcse', 'ib', 'a-level', 'dse'].includes(activeTab);
+            const handleSendToAdmins = async () => {
+                if(!message) return;
+                await window.FB.addDoc(window.FB.collection(window.FB.db, "messages"), {
+                    from: userData.email, fromName: userData.name, content: message, subject: `${activeTab} - ${subTab}`, timestamp: window.FB.serverTimestamp()
+                });
+                alert("Message sent!"); setMessage('');
+            };
+            return (
+                <div className="space-y-12 animate-in pb-20">
+                    {isSenior ? (
+                        <div className="space-y-8">
+                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm"><h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Official Exam Board Curriculum</h3><div className="p-10 border-2 border-dashed border-slate-200 rounded-3xl text-center text-slate-400 font-bold text-xs uppercase cursor-pointer hover:bg-slate-50"><i className="fa-solid fa-link mr-2"></i> Official Specifications</div></section>
+                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm"><h3 className="text-sm font-black text-slate-800 uppercase mb-4 tracking-tight">Schemes of Work</h3><button className="bg-indigo-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase">Upload Shared SOW</button></section>
+                        </div>
+                    ) : (
+                        <div className="space-y-10">
+                            <section className="bg-white p-10 rounded-[3rem] border shadow-sm"><h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-6">End of Year Goals</h3><ul className="list-disc pl-6 space-y-3 text-sm font-semibold text-slate-700"><li>Analyze historical continuity and the impact of the past on modern identity.</li><li>Evaluate geographical changes through thematic mapping.</li><li>Demonstrate civic responsibility through citizenship projects.</li><li>Apply economic logic to local business models.</li></ul></section>
+                            <div className="space-y-6">
+                                {factions.map(f => (
+                                    <div key={f.name} className="flex flex-col lg:flex-row gap-6">
+                                        <div className="flex-1 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex items-center gap-6">
+                                            <div className={`${f.bg} ${f.color} w-16 h-16 rounded-full flex items-center justify-center text-2xl shrink-0`}><i className={`fa-solid ${f.icon}`}></i></div>
+                                            <div><h5 className="text-xl font-black text-slate-800 mb-1">{f.name}</h5><p className="text-xs text-slate-400 font-bold uppercase mb-2 tracking-widest">Curriculum Standard</p><p className="text-sm text-slate-500 font-medium leading-relaxed">Network goals for {subTab} learners.</p></div>
+                                        </div>
+                                        <div className="w-full lg:w-72 bg-slate-900 p-8 rounded-[3rem] text-white flex flex-col justify-center"><p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-4">Example Topics</p><div className="flex flex-wrap gap-2">{f.topics.map(t => <span key={t} className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold border border-white/10">{t}</span>)}</div></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    <section className="bg-indigo-900 p-10 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden"><div className="absolute top-0 right-0 p-8 text-7xl opacity-10"><i className="fa-solid fa-paper-plane"></i></div><h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4 tracking-tighter">Ask the Curriculum Officer</h4><textarea value={message} onChange={e => setMessage(e.target.value)} className="w-full bg-slate-800 p-6 rounded-2xl border-none text-sm text-white outline-none mb-4 focus:ring-2 focus:ring-indigo-500" placeholder="Type your question..." /><button onClick={handleSendToAdmins} className="px-10 py-4 bg-white text-indigo-900 rounded-2xl font-black uppercase text-[10px] tracking-widest">Send Message</button></section>
+                </div>
+            );
+        };
+
+        const Dashboard = ({ userData, isSubscribed }) => (
+            <div className="space-y-8 animate-in pb-20">
+                <div className="mesh-bg rounded-[4rem] p-16 text-white shadow-2xl relative">
+                    <div className="mesh-circle"></div>
+                    <h1 className="text-5xl font-black relative z-10 tracking-tighter leading-none">Welcome to YCYW Humanities Portal</h1>
+                    <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-[0.5em]">Global Excellence Network</p>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-8">
+                        <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                            <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Your Notified Subjects</h3>
+                            {isSubscribed ? <div className="p-4 bg-emerald-50 text-emerald-700 rounded-2xl font-bold text-xs uppercase">Recent Updates for your followed strands</div> : <div className="py-10 text-center border-2 border-dashed rounded-3xl text-slate-300 font-bold text-xs uppercase">No active subscriptions</div>}
+                        </section>
+                        <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                            <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Foundation Newsfeed</h3>
+                            <div className="p-4 bg-slate-50 rounded-2xl text-sm font-semibold text-slate-700">Symposium 2025 registration is now open!</div>
+                        </section>
+                    </div>
+                    <section className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl">
+                        <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Upcoming PD Opportunities</h3>
+                        <div className="border-l-2 border-indigo-500 pl-4 py-1 text-sm font-bold">Jan 22: Network Moderation Training</div>
+                    </section>
+                </div>
+            </div>
+        );
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [userData, setUserData] = useState(null);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [subTab, setSubTab] = useState(null);
+            const [expanded, setExpanded] = useState(null); 
+            const [viewMode, setViewMode] = useState('curriculum');
+            const [isSubscribed, setIsSubscribed] = useState(false);
+
+            useEffect(() => {
+                const unsub = window.FB.onAuthStateChanged(window.FB.auth, async (u) => {
+                    if (u) {
+                        const d = await window.FB.getDoc(window.FB.doc(window.FB.db, "users", u.uid));
+                        if (d.exists()) { setUserData(d.data()); setUser(u); }
+                    } else { setUser(null); setUserData(null); }
+                });
+                return () => unsub();
+            }, []);
+
+            const navConfig = [
+                { id: 'dashboard', label: 'Dashboard', icon: 'fa-gauge' },
+                { id: 'primary', label: 'Primary', icon: 'fa-child', subs: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6'] },
+                { id: 'lower-secondary', label: 'Lower Secondary', icon: 'fa-seedling', subs: ['Year 7', 'Year 8', 'Year 9'] },
+                { id: 'igcse', label: 'IGCSE', icon: 'fa-book-bookmark', subs: ['History', 'Geography', 'Psychology', 'Sociology', 'Economics', 'Business', 'Enterprise', 'Global Perspectives'] },
+                { id: 'ib', label: 'IB', icon: 'fa-graduation-cap', subs: ['History', 'Geography', 'Psychology', 'Economics', 'Business', 'Philosophy'] },
+                { id: 'a-level', label: 'A-Level', icon: 'fa-award', subs: ['History', 'Geography', 'Economics', 'Business'] },
+                { id: 'dse', label: 'DSE', icon: 'fa-pen-to-square', subs: ['Economics', 'Business'] },
+                { id: 'admin', label: 'Admin Hub', icon: 'fa-shield-halved', adminOnly: true }
+            ];
+
+            if (!user) return <div className="h-screen flex items-center justify-center bg-[#0f172a] text-white">Authenticating...</div>;
+
+            return (
+                <div className="flex h-screen bg-slate-50 overflow-hidden">
+                    {/* Sidebar */}
+                    <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl overflow-y-auto custom-scrollbar">
+                        <div className="p-8 font-black text-sm uppercase text-indigo-400">YCYW Humanities</div>
+                        <nav className="flex-1 px-4 space-y-1">
+                            {navConfig.map(item => {
+                                if (item.adminOnly && userData?.role !== 'ADMIN') return null;
+                                const isExpanded = expanded === item.id;
+                                return (
+                                    <div key={item.id}>
+                                        <button onClick={() => item.subs ? setExpanded(isExpanded ? null : item.id) : (setActiveTab(item.id), setSubTab(null))}
+                                            className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest ${activeTab === item.id && !subTab ? 'bg-indigo-600' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                            <div className="flex items-center gap-3"><i className={`fa-solid ${item.icon} w-4`}></i>{item.label}</div>
+                                            {item.subs && <i className={`fa-solid fa-chevron-down opacity-30 ${isExpanded ? 'rotate-180' : ''}`}></i>}
+                                        </button>
+                                        {item.subs && isExpanded && (
+                                            <div className="ml-6 space-y-1 mt-1 border-l border-slate-700/50">
+                                                {item.subs.map(sub => (
+                                                    <button key={sub} onClick={() => { setActiveTab(item.id); setSubTab(sub); setViewMode('curriculum'); }}
+                                                        className={`w-full text-left px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest ${subTab === sub ? 'text-indigo-400 bg-slate-800' : 'text-slate-500 hover:text-slate-300'}`}>
+                                                        {sub}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </nav>
+                        <div className="p-4 border-t border-slate-800"><button onClick={() => window.FB.signOut(window.FB.auth)} className="w-full p-4 bg-slate-800 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:text-red-400">Logout</button></div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <header className="h-24 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm">
+                            <div className="flex items-center gap-6">
+                                <div>
+                                    <h2 className="font-black text-slate-800 uppercase text-lg leading-none tracking-tight">{subTab || activeTab.replace('-', ' ')}</h2>
+                                    {subTab && (
+                                        <button onClick={() => setIsSubscribed(!isSubscribed)} className={`mt-2 flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.2em] ${isSubscribed ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                            <i className={`fa-solid ${isSubscribed ? 'fa-bell' : 'fa-bell-slash'}`}></i>
+                                            {isSubscribed ? 'Subscribed' : 'Receive Notifications'}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-6">
+                                {subTab && (
+                                    <div className="bg-slate-100 p-1 rounded-2xl flex gap-1 shadow-inner">
+                                        <button onClick={() => setViewMode('curriculum')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'curriculum' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Curriculum</button>
+                                        <button onClick={() => setViewMode('shared')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'shared' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Shared Resources</button>
+                                    </div>
+                                )}
+                                <button className="relative flex items-center gap-3 px-4 py-3 bg-slate-100 rounded-xl group hover:bg-indigo-50 transition-all shadow-sm">
+                                    <i className="fa-solid fa-inbox text-slate-400 group-hover:text-indigo-600"></i>
+                                    <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-indigo-600">Inbox</span>
+                                </button>
+                                <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs uppercase shadow-lg shadow-indigo-100">{userData?.name?.[0] || 'U'}</div>
+                            </div>
+                        </header>
+
+                        <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc]">
+                            {activeTab === 'dashboard' ? (
+                                <Dashboard userData={userData} isSubscribed={isSubscribed} />
+                            ) : subTab ? (
+                                viewMode === 'curriculum' ? 
+                                <CurriculumView activeTab={activeTab} subTab={subTab} isAdmin={userData?.role === 'ADMIN'} userData={userData} /> : 
+                                <SharedResources activeTab={activeTab} subTab={subTab} userData={userData} />
+                            ) : (
+                                <div className="text-center py-40 text-slate-300 font-black uppercase text-[10px] tracking-[0.5em]">Select a folder to begin</div>
+                            )}
+                        </main>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
