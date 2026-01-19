@@ -18,7 +18,6 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .progress-bar-fill { transition: width 0.4s ease; }
     </style>
 </head>
 <body>
@@ -26,9 +25,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, doc, getDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
@@ -40,157 +37,154 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        window.FB = { 
-            auth: getAuth(app), db: getFirestore(app), storage: getStorage(app),
-            collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, doc, getDoc, updateDoc, setDoc,
-            ref, uploadBytesResumable, getDownloadURL
-        };
+        window.FB = { db: getFirestore(app), doc, onSnapshot, setDoc, collection };
     </script>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        const PILLAR_TEMPLATES = {
-            pastPresent: { category: "Past & Present", icon: "fa-clock-rotate-left", color: "bg-amber-500" },
-            evolvingWorld: { category: "Our Evolving World", icon: "fa-earth-americas", color: "bg-emerald-500" },
-            globalCitizen: { category: "Responsible Global Citizen", icon: "fa-hands-holding-circle", color: "bg-indigo-500" },
-            econBusiness: { category: "Economics & Business", icon: "fa-shop", color: "bg-rose-500" }
+        const EXPLANATIONS = {
+            "Analyze": "Break down in order to bring out the essential elements or structure.",
+            "Evaluate": "Make an appraisal by weighing up the strengths and limitations.",
+            "Explain": "Give a detailed account including reasons or causes.",
+            "Inquiry": "The process of asking questions and investigating evidence.",
+            "Map Reading": "The ability to interpret spatial data and symbols on a grid."
         };
 
-        const INITIAL_YC_DATA = {
-            "Year 1": { goals: ["Identify family members.", "Cardinals."], skills: ["Map reading"], commandTerms: ["List"], domains: [{ ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.1.1", title: "Family History", description: "Personal backgrounds." }] }] },
-            "Year 2": { goals: ["Local history."], skills: ["Sketching"], commandTerms: ["Describe"], domains: [{ ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.2.1", title: "Local Area", description: "Changes over 50 years." }] }] },
-            "Year 3": { goals: ["Ancient Egypt."], skills: ["Inquiry"], commandTerms: ["Explain"], domains: [{ ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.3.1", title: "Settlements", description: "Ancient Nile importance." }] }] },
-            "Year 4": { goals: ["Roman engineering."], skills: ["Data charts"], commandTerms: ["Analyze"], domains: [{ ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.4.1", title: "Roman Legacy", description: "Impact on modern life." }] }] },
-            "Year 5": { goals: ["Victorian social change."], skills: ["Compass use"], commandTerms: ["Contrast"], domains: [{ ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.5.1", title: "Victorian Era", description: "Industrial impact." }] }] },
-            "Year 6": { goals: ["World War II impacts."], skills: ["Essay drafting"], commandTerms: ["Justify"], domains: [{ ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.6.1", title: "Modern World", description: "20th Century events." }] }] },
-            "Year 7": { goals: ["PEEL structure.", "Source types."], skills: ["Map reading"], commandTerms: ["Outline"], domains: [{ ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.7.1", title: "Ancient Foundations", description: "Civilization traits." }] }] },
-            "Year 8": { goals: ["Balanced arguments.", "Urbanisation."], skills: ["Comparative analysis"], commandTerms: ["Interpret"], domains: [{ ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.8.1", title: "Era of Revolutions", description: "Industrial changes." }] }] },
-            "Year 9": { goals: ["OPVL evaluation.", "Sustainability."], skills: ["Statistical synthesis"], commandTerms: ["Synthesize"], domains: [{ ...PILLAR_TEMPLATES.pastPresent, standards: [{ code: "PP.9.1", title: "Global Conflicts", description: "Geopolitical shifts." }] }] }
-        };
+        const PILLAR_DEFAULTS = [
+            { id: "pp", name: "Past & Present", icon: "fa-clock", color: "bg-amber-500", reqs: "Add requirements...", topics: "Add topics..." },
+            { id: "ew", name: "Our Evolving World", icon: "fa-earth-asia", color: "bg-emerald-500", reqs: "Add requirements...", topics: "Add topics..." },
+            { id: "gc", name: "Global Citizenship", icon: "fa-hands-holding-circle", color: "bg-indigo-500", reqs: "Add requirements...", topics: "Add topics..." },
+            { id: "eb", name: "Economics & Business", icon: "fa-chart-line", color: "bg-rose-500", reqs: "Add requirements...", topics: "Add topics..." }
+        ];
 
-        const CurriculumView = ({ activeYear, isAdmin }) => {
-            const [ycData, setYcData] = useState(INITIAL_YC_DATA);
+        const CurriculumView = ({ activeYear }) => {
+            const [localData, setLocalData] = useState(null);
             const [isEditing, setIsEditing] = useState(false);
-            const framework = ycData[activeYear] || { goals: [], skills: [], commandTerms: [], domains: [] };
+            const [explanation, setExplanation] = useState(null);
+            const [activePillarTab, setActivePillarTab] = useState('reqs');
 
-            const updateField = (field, index, value, subIndex = null, domainIndex = null) => {
-                const newData = { ...ycData };
-                if (domainIndex !== null) {
-                    newData[activeYear].domains[domainIndex].standards[subIndex][field] = value;
-                } else {
-                    newData[activeYear][field][index] = value;
-                }
-                setYcData(newData);
+            // --- FIREBASE SYNC ---
+            useEffect(() => {
+                const docRef = window.FB.doc(window.FB.db, "curriculum_metadata", activeYear.replace(/\s+/g, '_'));
+                const unsub = window.FB.onSnapshot(docRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        setLocalData(docSnap.data());
+                    } else {
+                        // Initialize default if empty
+                        setLocalData({
+                            goals: ["Goal 1...", "Goal 2..."],
+                            skills: ["Inquiry", "Map Reading"],
+                            commandTerms: ["Analyze", "Explain"],
+                            pillars: PILLAR_DEFAULTS
+                        });
+                    }
+                });
+                return () => unsub();
+            }, [activeYear]);
+
+            const handleSave = async () => {
+                const docRef = window.FB.doc(window.FB.db, "curriculum_metadata", activeYear.replace(/\s+/g, '_'));
+                await window.FB.setDoc(docRef, localData);
+                setIsEditing(false);
             };
 
+            const updateField = (category, index, value, pillarId = null) => {
+                const newData = JSON.parse(JSON.stringify(localData));
+                if (pillarId) {
+                    const pIdx = newData.pillars.findIndex(p => p.id === pillarId);
+                    newData.pillars[pIdx][category] = value;
+                } else {
+                    newData[category][index] = value;
+                }
+                setLocalData(newData);
+            };
+
+            if (!localData) return <div className="p-20 text-center font-black animate-pulse text-indigo-600">Syncing with YCYW Cloud...</div>;
+
             return (
-                <div className="space-y-12 animate-in pb-20">
-                    <div className="flex justify-between items-end">
-                        <div>
-                            <span className="bg-indigo-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">YCYW Internal</span>
-                            <h1 className="text-4xl font-black text-slate-900 mt-2">{activeYear} Curriculum Hub</h1>
+                <div className="space-y-10 animate-in pb-20">
+                    {explanation && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm" onClick={() => setExplanation(null)}>
+                            <div className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full animate-in" onClick={e => e.stopPropagation()}>
+                                <h4 className="text-2xl font-black text-indigo-600 mb-4">{explanation.title}</h4>
+                                <p className="text-slate-600 font-medium leading-relaxed">{EXPLANATIONS[explanation.title] || "Pedagogical detail is currently being updated."}</p>
+                                <button className="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs" onClick={() => setExplanation(null)}>Close</button>
+                            </div>
                         </div>
-                        {isAdmin && (
-                            <button onClick={() => setIsEditing(!isEditing)} className={`px-6 py-3 rounded-2xl font-black text-sm text-white shadow-lg transition-all ${isEditing ? 'bg-amber-500 scale-105' : 'bg-slate-900'}`}>
-                                <i className={`fa-solid ${isEditing ? 'fa-save' : 'fa-pen-to-square'} mr-2`}></i>
-                                {isEditing ? 'Save Changes' : 'Edit Framework'}
-                            </button>
-                        )}
+                    )}
+
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{activeYear} Curriculum</h2>
+                        <button onClick={isEditing ? handleSave : () => setIsEditing(true)} className={`px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest text-white shadow-xl transition-all ${isEditing ? 'bg-emerald-500 scale-110' : 'bg-indigo-600'}`}>
+                            {isEditing ? 'Confirm & Push Live' : 'Edit Framework'}
+                        </button>
                     </div>
 
-                    {/* Achievement Goals */}
-                    <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
-                        <h2 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6"><i className="fa-solid fa-bullseye mr-2"></i>Achievement Goals</h2>
-                        <div className="space-y-4">
-                            {framework.goals.map((goal, idx) => (
-                                <div key={idx} className="flex items-center gap-4">
-                                    <div className="w-2 h-2 rounded-full bg-indigo-600"></div>
-                                    {isEditing ? (
-                                        <input className="flex-1 bg-slate-50 p-3 rounded-xl font-bold border-none outline-none focus:ring-2 focus:ring-indigo-500" value={goal} onChange={(e) => updateField('goals', idx, e.target.value)} />
-                                    ) : <p className="text-xl font-bold text-slate-700">{goal}</p>}
+                    <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
+                        <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-8">Achievement Goals</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {localData.goals.map((g, i) => (
+                                <div key={i} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-transparent hover:border-indigo-100 transition-all">
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></div>
+                                    {isEditing ? <input className="w-full bg-transparent font-bold outline-none" value={g} onChange={e => updateField('goals', i, e.target.value)} /> : <p className="font-bold text-slate-700">{g}</p>}
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* Skills & Terms */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="bg-slate-900 p-8 rounded-[3rem] text-white">
-                            <h3 className="text-[10px] font-black text-indigo-300 uppercase mb-6">Core Skills</h3>
+                        <div className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-2xl">
+                            <h3 className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-6">Skills Focus</h3>
                             <div className="flex flex-wrap gap-3">
-                                {framework.skills.map((s, idx) => isEditing ? (
-                                    <input key={idx} className="bg-white/10 p-2 rounded-xl text-sm outline-none w-32" value={s} onChange={(e) => updateField('skills', idx, e.target.value)} />
-                                ) : <span key={idx} className="bg-white/10 px-5 py-2.5 rounded-2xl text-sm font-bold">{s}</span>)}
-                            </div>
-                        </div>
-                        <div className="bg-indigo-600 p-8 rounded-[3rem] text-white">
-                            <h3 className="text-[10px] font-black text-indigo-100 uppercase mb-6">Command Terms</h3>
-                            <div className="flex flex-wrap gap-3">
-                                {framework.commandTerms.map((t, idx) => isEditing ? (
-                                    <input key={idx} className="bg-white/20 p-2 rounded-xl text-sm outline-none w-32" value={t} onChange={(e) => updateField('commandTerms', idx, e.target.value)} />
-                                ) : <span key={idx} className="bg-white/20 px-5 py-2.5 rounded-2xl text-sm font-black">{t}</span>)}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Pillar Standards */}
-                    {framework.domains.map((domain, dIdx) => (
-                        <div key={dIdx} className="flex flex-col md:flex-row gap-8">
-                            <div className="w-full md:w-1/4">
-                                <div className={`${domain.color} w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg`}><i className={`fa-solid ${domain.icon}`}></i></div>
-                                <h3 className="text-xl font-black text-slate-800 mt-4">{domain.category}</h3>
-                            </div>
-                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {domain.standards.map((std, sIdx) => (
-                                    <div key={sIdx} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <span className={`${domain.color} text-white text-[9px] font-black px-3 py-1 rounded-lg`}>{std.code}</span>
-                                        </div>
-                                        {isEditing ? (
-                                            <div className="space-y-3">
-                                                <input className="w-full font-black text-slate-800 border-b outline-none" value={std.title} onChange={(e) => updateField('title', null, e.target.value, sIdx, dIdx)} />
-                                                <textarea className="w-full text-sm text-slate-500 outline-none" value={std.description} onChange={(e) => updateField('description', null, e.target.value, sIdx, dIdx)} />
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <h4 className="font-black text-slate-800 text-lg mb-2">{std.title}</h4>
-                                                <p className="text-sm text-slate-500 font-medium leading-relaxed">{std.description}</p>
-                                            </>
-                                        )}
+                                {localData.skills.map((s, i) => (
+                                    <div key={i} className="flex gap-2 bg-white/10 p-1 pr-4 rounded-2xl border border-white/5 items-center">
+                                        {isEditing ? <input className="bg-transparent text-sm font-bold w-24 outline-none ml-2" value={s} onChange={e => updateField('skills', i, e.target.value)} /> : 
+                                        <button onClick={() => setExplanation({title: s})} className="text-sm font-bold ml-3 hover:text-indigo-300 transition-colors uppercase tracking-widest">{s}</button>}
                                     </div>
                                 ))}
                             </div>
                         </div>
-                    ))}
-                </div>
-            );
-        };
-
-        const ResourceRepo = ({ type, activeTab, subTab, userData, addNotification }) => {
-            const [items, setItems] = useState([]);
-            const [isUploading, setIsUploading] = useState(false);
-            const [newRes, setNewRes] = useState({ title: '', files: [] });
-            const dbKey = `${type}_${activeTab}_${subTab}`.replace(/\s+/g, '_');
-
-            useEffect(() => {
-                const q = window.FB.query(window.FB.collection(window.FB.db, dbKey), window.FB.orderBy("timestamp", "desc"));
-                return window.FB.onSnapshot(q, (s) => setItems(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-            }, [dbKey]);
-
-            return (
-                <div className="space-y-6">
-                    <div className="flex justify-between items-center bg-white p-6 rounded-3xl border">
-                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">{subTab} Repository</h3>
-                        <button onClick={() => setIsUploading(true)} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px]">Add Content</button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {items.map(item => (
-                            <div key={item.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-                                <h4 className="font-black text-slate-800">{item.title}</h4>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-2">Shared by {item.author}</p>
+                        <div className="bg-indigo-600 p-8 rounded-[3rem] text-white shadow-2xl">
+                            <h3 className="text-[10px] font-black text-indigo-100 uppercase tracking-widest mb-6">Command Terms</h3>
+                            <div className="flex flex-wrap gap-3">
+                                {localData.commandTerms.map((t, i) => (
+                                    <div key={i} className="flex gap-2 bg-white/20 p-1 pr-4 rounded-2xl border border-white/10 items-center">
+                                        {isEditing ? <input className="bg-transparent text-sm font-bold w-24 outline-none ml-2" value={t} onChange={e => updateField('commandTerms', i, e.target.value)} /> : 
+                                        <button onClick={() => setExplanation({title: t})} className="text-sm font-black ml-3 hover:text-indigo-200 transition-colors uppercase tracking-widest">{t}</button>}
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] text-center">Network Focus Areas</h3>
+                        <div className="grid grid-cols-1 gap-6">
+                            {localData.pillars.map(p => (
+                                <div key={p.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col lg:flex-row gap-8 hover:shadow-md transition-shadow">
+                                    <div className="w-full lg:w-1/4 flex flex-col items-center justify-center text-center border-b lg:border-b-0 lg:border-r border-slate-50 pb-6 lg:pb-0 lg:pr-8">
+                                        <div className={`${p.color} w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-white text-2xl shadow-lg mb-4`}><i className={`fa-solid ${p.icon}`}></i></div>
+                                        <h4 className="font-black text-slate-800 leading-tight uppercase text-xs tracking-widest">{p.name}</h4>
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex gap-4 mb-6">
+                                            <button onClick={() => setActivePillarTab('reqs')} className={`text-[10px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${activePillarTab === 'reqs' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-300'}`}>Requirements</button>
+                                            <button onClick={() => setActivePillarTab('topics')} className={`text-[10px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${activePillarTab === 'topics' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-300'}`}>Example Topics</button>
+                                        </div>
+                                        <div className="p-6 bg-slate-50 rounded-3xl min-h-[120px] flex items-center shadow-inner">
+                                            {isEditing ? (
+                                                <textarea 
+                                                    className="w-full bg-transparent font-medium text-slate-600 outline-none h-full border-none focus:ring-0 resize-none" 
+                                                    value={activePillarTab === 'reqs' ? p.reqs : p.topics} 
+                                                    onChange={e => updateField(activePillarTab === 'reqs' ? 'reqs' : 'topics', null, e.target.value, p.id)}
+                                                />
+                                            ) : <p className="text-slate-600 font-medium leading-relaxed italic">{activePillarTab === 'reqs' ? p.reqs : p.topics}</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             );
@@ -199,22 +193,22 @@
         const App = () => {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [subTab, setSubTab] = useState(null);
-            const [viewMode, setViewMode] = useState('curriculum');
             const [expandedNav, setExpandedNav] = useState(null);
-            const [currentUser] = useState({ name: 'Staff Member', role: 'ADMIN', notifications: [] });
-
+            
             const navConfig = [
                 { id: 'dashboard', label: 'Dashboard', icon: 'fa-gauge' },
                 { id: 'primary', label: 'Primary', icon: 'fa-child', subs: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6'] },
                 { id: 'lower-secondary', label: 'Lower Secondary', icon: 'fa-seedling', subs: ['Year 7', 'Year 8', 'Year 9'] },
                 { id: 'igcse', label: 'IGCSE', icon: 'fa-book-bookmark', subs: ['History', 'Geography', 'Economics', 'Business', 'Psychology', 'Sociology'] },
-                { id: 'ib', label: 'IB', icon: 'fa-graduation-cap', subs: ['History', 'Geography', 'Psychology', 'Philosophy', 'Economics', 'Business'] }
+                { id: 'ib', label: 'IB', icon: 'fa-graduation-cap', subs: ['History', 'Geography', 'Economics', 'Business', 'Psychology', 'Philosophy'] }
             ];
 
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden font-inter text-slate-900">
                     <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl overflow-y-auto custom-scrollbar">
-                        <div className="p-8 font-black text-sm uppercase text-indigo-400">YCYW Humanities</div>
+                        <div className="p-8 font-black text-sm uppercase text-indigo-400 tracking-tighter leading-none">
+                            YCYW Humanities <br/><span className="text-[8px] opacity-40">Live Framework Sync</span>
+                        </div>
                         <nav className="flex-1 px-4 space-y-1">
                             {navConfig.map(item => (
                                 <div key={item.id}>
@@ -226,7 +220,7 @@
                                     {item.subs && expandedNav === item.id && (
                                         <div className="ml-6 space-y-1 mt-1 border-l border-slate-700/50">
                                             {item.subs.map(sub => (
-                                                <button key={sub} onClick={() => { setActiveTab(item.id); setSubTab(sub); setViewMode('curriculum'); }}
+                                                <button key={sub} onClick={() => { setActiveTab(item.id); setSubTab(sub); }}
                                                     className={`w-full text-left px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest ${subTab === sub ? 'text-indigo-400 bg-slate-800' : 'text-slate-500 hover:text-slate-300'}`}>
                                                     {sub}
                                                 </button>
@@ -238,34 +232,27 @@
                         </nav>
                     </div>
 
-                    <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 flex flex-col min-w-0">
                         <header className="h-24 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm z-10">
-                            <h2 className="font-black text-slate-800 uppercase text-lg">{subTab || activeTab}</h2>
-                            <div className="flex items-center gap-6">
-                                {subTab && (
-                                    <div className="bg-slate-100 p-1 rounded-2xl flex gap-1 shadow-inner">
-                                        <button onClick={() => setViewMode('curriculum')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'curriculum' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Curriculum</button>
-                                        <button onClick={() => setViewMode('shared')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'shared' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Resources</button>
-                                        <button onClick={() => setViewMode('assessments')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'assessments' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Assessments</button>
-                                    </div>
-                                )}
-                                <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs">S</div>
-                            </div>
+                            <h2 className="font-black text-slate-800 uppercase text-lg leading-none tracking-tighter">{subTab || activeTab}</h2>
+                            <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs shadow-lg uppercase">S</div>
                         </header>
 
                         <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
                             {activeTab === 'dashboard' ? (
-                                <div className="p-16 mesh-bg rounded-[4rem] text-white shadow-2xl relative overflow-hidden">
-                                    <div className="mesh-circle"></div>
-                                    <h1 className="text-5xl font-black relative z-10 tracking-tighter leading-none">Humanities Network Hub</h1>
-                                    <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-[0.5em]">2026 Academic Framework</p>
+                                <div className="space-y-8">
+                                    <div className="p-16 mesh-bg rounded-[4rem] text-white shadow-2xl relative overflow-hidden text-center">
+                                        <div className="mesh-circle"></div>
+                                        <h1 className="text-5xl font-black relative z-10 tracking-tighter">Live Network Hub</h1>
+                                        <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-widest">Shared Curriculum standards</p>
+                                    </div>
+                                    <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                                        <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Sync Status</h3>
+                                        <p className="text-xs font-bold text-slate-400 uppercase">Connected to Firebase Realtime Database: <span className="text-emerald-500 ml-2">Healthy</span></p>
+                                    </div>
                                 </div>
                             ) : subTab ? (
-                                viewMode === 'curriculum' ? (
-                                    <CurriculumView activeYear={subTab} isAdmin={currentUser.role === 'ADMIN'} />
-                                ) : (
-                                    <ResourceRepo type={viewMode === 'shared' ? 'shared_resources' : 'assessments'} activeTab={activeTab} subTab={subTab} userData={currentUser} />
-                                )
+                                <CurriculumView activeYear={subTab} />
                             ) : null}
                         </main>
                     </div>
