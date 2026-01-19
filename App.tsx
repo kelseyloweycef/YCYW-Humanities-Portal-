@@ -87,7 +87,6 @@ const App: React.FC = () => {
   const [selectedSubTab, setSelectedSubTab] = useState<string | undefined>(undefined);
   const [resources, setResources] = useState<Resource[]>(INITIAL_RESOURCES);
   const [forumPosts, setForumPosts] = useState<ForumPost[]>([]);
-  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
   const [calendarEvents] = useState<CalendarEvent[]>(INITIAL_CALENDAR_EVENTS);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploadPresets, setUploadPresets] = useState<Partial<Resource> | null>(null);
@@ -101,11 +100,8 @@ const App: React.FC = () => {
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
   useEffect(() => {
-    if (schoolLogo) {
-      localStorage.setItem('ycyw_school_logo', schoolLogo);
-    } else {
-      localStorage.removeItem('ycyw_school_logo');
-    }
+    if (schoolLogo) localStorage.setItem('ycyw_school_logo', schoolLogo);
+    else localStorage.removeItem('ycyw_school_logo');
   }, [schoolLogo]);
 
   useEffect(() => {
@@ -113,7 +109,7 @@ const App: React.FC = () => {
     document.title = appName;
   }, [appName]);
 
-  // Utility to create a notification for current user (Mock: in real app, this targets other users)
+  // Centralized Notification Trigger
   const addNotification = (notif: Partial<Notification>) => {
     const newNotif: Notification = {
       id: Math.random().toString(36).substr(2, 9),
@@ -136,41 +132,23 @@ const App: React.FC = () => {
     const approvedResource = { ...newResource, status: ResourceStatus.APPROVED };
     setResources(prev => [approvedResource, ...prev]);
     setIsUploadOpen(false);
-    setUploadPresets(null);
-
-    // Mock: Notify subscribers of this context OR for PD
-    const context = (newResource.yearGroup as string) === 'IGCSE' || (newResource.yearGroup as string) === 'IB / A-Level' 
-      ? newResource.subject 
-      : newResource.yearGroup;
+    
+    // Notify Subscribers
+    const context = (newResource.yearGroup === YearGroup.IGCSE || newResource.yearGroup === YearGroup.IB_ALEVEL)
+      ? newResource.subject : newResource.yearGroup;
 
     if (currentUser?.subscriptions.includes(context as string) || newResource.type === ResourceType.PROFESSIONAL_DEVELOPMENT) {
       let msg = `New resource: ${newResource.title}`;
       if (newResource.type === ResourceType.COURSEWORK || newResource.type === ResourceType.INTERNAL_ASSESSMENT) {
-        msg += " - This requires moderation.";
+        msg += " - Note: This requires moderation review.";
       }
       addNotification({
-        type: 'system',
-        title: newResource.type === ResourceType.PROFESSIONAL_DEVELOPMENT ? `PD Hub Update` : `New Upload in ${context}`,
+        title: newResource.type === ResourceType.PROFESSIONAL_DEVELOPMENT ? 'PD Hub Update' : `New ${context} Content`,
         message: msg,
         authorName: newResource.author,
         linkId: newResource.id,
         targetType: 'resource'
       });
-    }
-  };
-
-  const handleOpenUploadWithPresets = (presets: Partial<Resource>) => {
-    setUploadPresets(presets);
-    setIsUploadOpen(true);
-  };
-
-  const handleCalendarEventClick = (event: CalendarEvent) => {
-    if (event.type === 'pd' && event.resourceId) {
-      const res = resources.find(r => r.id === event.resourceId);
-      if (res) {
-        setActiveTab('pd');
-        setSelectedResource(res);
-      }
     }
   };
 
@@ -191,8 +169,8 @@ const App: React.FC = () => {
     if (context && currentUser?.subscriptions.includes(context as string)) {
       addNotification({
         type: 'comment',
-        title: `New Discussion in ${context}`,
-        message: `${post.author} started: ${post.title}`,
+        title: `Discussion Started in ${context}`,
+        message: `${post.author}: ${post.title}`,
         authorName: post.author,
         linkId: post.id,
         targetType: 'post'
@@ -203,11 +181,11 @@ const App: React.FC = () => {
   const handleAddResourceComment = (resourceId: string, comment: ResourceComment) => {
     setResources(prev => prev.map(r => {
       if (r.id === resourceId) {
-        // Notify resource author if it's not them
+        // Notify resource author
         if (r.author !== currentUser?.name) {
           addNotification({
             type: 'comment',
-            title: `New Comment on your resource`,
+            title: `New comment on your resource`,
             message: `${comment.author}: ${comment.content}`,
             authorName: comment.author,
             linkId: r.id,
@@ -220,10 +198,17 @@ const App: React.FC = () => {
     }));
   };
 
-  if (!currentUser) {
-    setCurrentUser(DEFAULT_USER);
-    return null;
-  }
+  const handleCalendarEventClick = (event: CalendarEvent) => {
+    if (event.type === 'pd' && event.resourceId) {
+      const res = resources.find(r => r.id === event.resourceId);
+      if (res) {
+        setActiveTab('pd');
+        setSelectedResource(res);
+      }
+    }
+  };
+
+  if (!currentUser) return null;
 
   const approvedResources = resources.filter(r => r.status === ResourceStatus.APPROVED);
 
@@ -266,21 +251,11 @@ const App: React.FC = () => {
           )}
           {activeTab === 'primary' && <YearGroupView resources={approvedResources} onResourceClick={setSelectedResource} mode="primary" forumPosts={forumPosts} setForumPosts={handleAddForumPost as any} currentUser={currentUser} globalSearchTerm={globalSearchTerm} initialSubTab={selectedSubTab} isAdmin={isAdmin} onToggleSubscription={handleToggleSubscription} />}
           {activeTab === 'years-7-9' && <YearGroupView resources={approvedResources} onResourceClick={setSelectedResource} mode="years" forumPosts={forumPosts} setForumPosts={handleAddForumPost as any} currentUser={currentUser} globalSearchTerm={globalSearchTerm} initialSubTab={selectedSubTab} isAdmin={isAdmin} onToggleSubscription={handleToggleSubscription} />}
-          {activeTab === 'igcse' && <YearGroupView resources={approvedResources} onResourceClick={setSelectedResource} mode="igcse" forumPosts={forumPosts} setForumPosts={handleAddForumPost as any} currentUser={currentUser} onContributePreset={handleOpenUploadWithPresets} globalSearchTerm={globalSearchTerm} initialSubTab={selectedSubTab} isAdmin={isAdmin} onToggleSubscription={handleToggleSubscription} />}
-          {activeTab === 'ib' && <YearGroupView resources={approvedResources} onResourceClick={setSelectedResource} mode="ib" forumPosts={forumPosts} setForumPosts={handleAddForumPost as any} currentUser={currentUser} onContributePreset={handleOpenUploadWithPresets} globalSearchTerm={globalSearchTerm} initialSubTab={selectedSubTab} isAdmin={isAdmin} onToggleSubscription={handleToggleSubscription} />}
+          {activeTab === 'igcse' && <YearGroupView resources={approvedResources} onResourceClick={setSelectedResource} mode="igcse" forumPosts={forumPosts} setForumPosts={handleAddForumPost as any} currentUser={currentUser} onContributePreset={(p) => { setUploadPresets(p); setIsUploadOpen(true); }} globalSearchTerm={globalSearchTerm} initialSubTab={selectedSubTab} isAdmin={isAdmin} onToggleSubscription={handleToggleSubscription} />}
+          {activeTab === 'ib' && <YearGroupView resources={approvedResources} onResourceClick={setSelectedResource} mode="ib" forumPosts={forumPosts} setForumPosts={handleAddForumPost as any} currentUser={currentUser} onContributePreset={(p) => { setUploadPresets(p); setIsUploadOpen(true); }} globalSearchTerm={globalSearchTerm} initialSubTab={selectedSubTab} isAdmin={isAdmin} onToggleSubscription={handleToggleSubscription} />}
           {activeTab === 'pd' && <PDView resources={approvedResources} onResourceClick={setSelectedResource} globalSearchTerm={globalSearchTerm} />}
           {activeTab === 'admin' && isAdmin && (
-            <AdminPanel 
-              resources={[]} 
-              users={pendingUsers} 
-              onApproveResource={(id) => {}} 
-              onDeleteResource={(id) => {}} 
-              onApproveUser={() => {}} 
-              schoolLogo={schoolLogo} 
-              onUpdateLogo={setSchoolLogo} 
-              appName={appName}
-              onUpdateAppName={setAppName}
-            />
+            <AdminPanel resources={[]} users={[]} onApproveResource={()=>{}} onDeleteResource={()=>{}} onApproveUser={()=>{}} schoolLogo={schoolLogo} onUpdateLogo={setSchoolLogo} appName={appName} onUpdateAppName={setAppName} />
           )}
         </main>
         <AIAssistant />
@@ -291,45 +266,18 @@ const App: React.FC = () => {
           resource={selectedResource} 
           onClose={() => setSelectedResource(null)} 
           onAddComment={handleAddResourceComment}
-          onAddFiles={(id, files) => {}}
-          onApproveResource={(id) => {}}
-          onDeleteResource={(id) => {
-            setResources(prev => prev.filter(r => r.id !== id));
-            setSelectedResource(null);
-          }}
+          onAddFiles={() => {}}
+          onApproveResource={() => {}}
+          onDeleteResource={(id) => { setResources(prev => prev.filter(r => r.id !== id)); setSelectedResource(null); }}
           currentUser={currentUser}
         />
       )}
       {profileViewUser && (
-        <ProfileModal 
-          isOpen={!!profileViewUser} 
-          onClose={() => setProfileViewUser(null)} 
-          user={profileViewUser} 
-          isOwnProfile={profileViewUser.id === currentUser.id} 
-          onUpdate={(updated) => {
-            if (updated.id === currentUser.id) setCurrentUser(updated);
-            setProfileViewUser(null);
-          }}
-        />
+        <ProfileModal isOpen={!!profileViewUser} onClose={() => setProfileViewUser(null)} user={profileViewUser} isOwnProfile={profileViewUser.id === currentUser.id} onUpdate={(u) => { if (u.id === currentUser.id) setCurrentUser(u); setProfileViewUser(null); }} />
       )}
-      <Inbox 
-        isOpen={isInboxOpen} 
-        onClose={() => setIsInboxOpen(false)} 
-        user={currentUser} 
-        onMarkRead={(id) => {
-          setCurrentUser(prev => prev ? {
-            ...prev,
-            notifications: prev.notifications.map(n => n.id === id ? { ...n, isRead: true } : n)
-          } : null);
-        }}
-        onClearAll={() => {
-          setCurrentUser(prev => prev ? { ...prev, notifications: [] } : null);
-        }}
-        onNavigate={(notif) => {
-          setIsInboxOpen(false);
-          // Auto route logic could go here
-        }}
-      />
+      <Inbox isOpen={isInboxOpen} onClose={() => setIsInboxOpen(false)} user={currentUser} onMarkRead={(id) => {
+          setCurrentUser(prev => prev ? ({ ...prev, notifications: prev.notifications.map(n => n.id === id ? { ...n, isRead: true } : n) }) : null);
+        }} onClearAll={() => { setCurrentUser(prev => prev ? ({ ...prev, notifications: [] }) : null); }} onNavigate={() => setIsInboxOpen(false)} />
     </div>
   );
 };

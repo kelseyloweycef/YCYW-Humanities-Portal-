@@ -110,15 +110,15 @@ export interface Resource {
   comments: ResourceComment[];
   status: ResourceStatus;
   files: ResourceFile[];
-  examPaper?: string; // e.g., "Paper 1", "Paper 2"
+  examPaper?: string; // simplified identifier e.g., "Paper 1"
 }
 
 export interface CalendarEvent {
   id: string;
   title: string;
-  date: string; // ISO string YYYY-MM-DD
+  date: string; // ISO YYYY-MM-DD
   type: 'pd' | 'deadline';
-  resourceId?: string; // Link to specific PD resource
+  resourceId?: string; // Links to a PD resource
 }
 
 export interface ForumPost {
