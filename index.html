@@ -28,8 +28,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
         const firebaseConfig = {
@@ -44,15 +44,15 @@
         const app = initializeApp(firebaseConfig);
         window.FB = { 
             auth: getAuth(app), db: getFirestore(app), storage: getStorage(app),
-            collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, doc, getDoc, updateDoc,
+            collection, onSnapshot, query, orderBy, addDoc, serverTimestamp,
             ref, uploadBytesResumable, getDownloadURL
         };
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect } = React;
 
-        // --- SUB-COMPONENT: DROPBOX REPOSITORY WITH NOTIFICATIONS ---
+        // --- SUB-COMPONENT: REPOSITORY COMPONENT ---
         const ResourceRepo = ({ type, activeTab, subTab, userData, addNotification }) => {
             const [items, setItems] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
@@ -60,7 +60,6 @@
             const [newRes, setNewRes] = useState({ title: '', strands: [], files: [], links: [] });
             const [linkInput, setLinkInput] = useState("");
             
-            const strands = ["Past and Present", "Our Evolving World", "Global Citizenship", "Economics & Business"];
             const dbKey = `${type}_${activeTab}_${subTab}`.replace(/\s+/g, '_');
 
             useEffect(() => {
@@ -87,22 +86,12 @@
                         });
                     });
                     const uploadedFiles = await Promise.all(uploadPromises);
-                    const docRef = await window.FB.addDoc(window.FB.collection(window.FB.db, dbKey), {
-                        title: newRes.title, files: uploadedFiles, links: newRes.links, strands: newRes.strands,
-                        author: userData.name || "Staff Member", timestamp: window.FB.serverTimestamp()
+                    await window.FB.addDoc(window.FB.collection(window.FB.db, dbKey), {
+                        title: newRes.title, files: uploadedFiles, links: newRes.links, author: userData.name, timestamp: window.FB.serverTimestamp()
                     });
-
-                    // Trigger Global Notification for Subscribers
-                    addNotification({
-                        title: `New ${type === 'shared_resources' ? 'Resource' : 'Assessment'}`,
-                        message: `${newRes.title} added to ${subTab}`,
-                        authorName: userData.name,
-                        linkId: docRef.id
-                    });
-
+                    addNotification({ title: `New Update`, message: `${newRes.title} added to ${subTab}`, authorName: userData.name });
                     setIsUploading(false);
                     setNewRes({ title: '', strands: [], files: [], links: [] });
-                    setProgressMap({});
                 } catch (e) { alert("Upload error."); setIsUploading(false); }
             };
 
@@ -115,11 +104,11 @@
 
                     {isUploading && (
                         <div className="bg-white p-10 rounded-[3rem] border-2 border-indigo-100 shadow-xl space-y-6">
-                            <input placeholder="Title" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-indigo-500" onChange={e => setNewRes({...newRes, title: e.target.value})} />
+                            <input placeholder="Material Title" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-indigo-500" onChange={e => setNewRes({...newRes, title: e.target.value})} />
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="file-drop-zone rounded-[2rem] p-8 text-center relative">
                                     <input type="file" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setNewRes(p => ({...p, files: [...p.files, ...Array.from(e.target.files)]}))} />
-                                    <i className="fa-solid fa-bolt text-2xl text-indigo-400 mb-2"></i>
+                                    <i className="fa-solid fa-cloud-arrow-up text-2xl text-indigo-400 mb-2"></i>
                                     <p className="text-[10px] font-black text-slate-400 uppercase">Dropbox Parallel Upload</p>
                                 </div>
                                 <div className="space-y-3">
@@ -130,38 +119,29 @@
                                     <div className="flex flex-wrap gap-2">{newRes.links.map((l, i) => <span key={i} className="text-[8px] bg-indigo-50 p-2 rounded truncate max-w-[100px]">{l}</span>)}</div>
                                 </div>
                             </div>
-                            {newRes.files.map((f, i) => (
-                                <div key={i} className="bg-slate-50 p-3 rounded-xl border">
-                                    <div className="flex justify-between text-[10px] font-bold mb-1"><span>{f.name}</span><span>{Math.round(progressMap[f.name] || 0)}%</span></div>
-                                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden"><div className="bg-indigo-600 h-full progress-bar-fill" style={{ width: `${progressMap[f.name] || 0}%` }}></div></div>
-                                </div>
-                            ))}
                             <div className="flex gap-2">
-                                <button onClick={handleUpload} className="flex-1 bg-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs">Confirm & Notify</button>
-                                <button onClick={() => {setIsUploading(false); setProgressMap({});}} className="px-8 bg-slate-100 rounded-xl font-black uppercase text-xs">Cancel</button>
+                                <button onClick={handleUpload} className="flex-1 bg-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs">Confirm & Push</button>
+                                <button onClick={() => setIsUploading(false)} className="px-8 bg-slate-100 rounded-xl font-black uppercase text-xs">Cancel</button>
                             </div>
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 gap-4 overflow-y-auto">
+                    <div className="grid grid-cols-1 gap-4">
                         {items.map(res => (
                             <div key={res.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 flex flex-col md:flex-row gap-6 items-center">
                                 <div className="flex-1 w-full text-center md:text-left">
                                     <h4 className="text-xl font-black text-slate-800 mb-2">{res.title}</h4>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared by {res.author}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Shared by {res.author}</p>
                                 </div>
                                 <div className="flex flex-wrap gap-3">
                                     {res.files?.map((f, i) => (
                                         <div key={i} className="bg-slate-50 border p-4 rounded-2xl flex items-center gap-3">
-                                            <i className="fa-solid fa-file-invoice text-indigo-400 text-xl"></i>
-                                            <div className="overflow-hidden"><p className="text-[9px] font-black truncate w-24 uppercase">{f.name}</p>
-                                            <a href={f.url} target="_blank" download className="text-[8px] text-indigo-600 font-bold uppercase hover:underline">Download</a></div>
+                                            <i className="fa-solid fa-file-invoice text-indigo-400"></i>
+                                            <div className="overflow-hidden"><p className="text-[9px] font-black truncate w-24 uppercase">{f.name}</p><a href={f.url} download className="text-[8px] text-indigo-600 font-bold uppercase">Download</a></div>
                                         </div>
                                     ))}
                                     {res.links?.map((l, i) => (
-                                        <a key={i} href={l} target="_blank" className="bg-indigo-50 p-4 rounded-2xl flex items-center gap-3 text-indigo-600">
-                                            <i className="fa-solid fa-link"></i><span className="text-[10px] font-black uppercase">Open Link</span>
-                                        </a>
+                                        <a key={i} href={l} target="_blank" className="bg-indigo-50 p-4 rounded-2xl flex items-center gap-3 text-indigo-600"><i className="fa-solid fa-link"></i><span className="text-[10px] font-black uppercase">Visit Link</span></a>
                                     ))}
                                     <button className="p-4 bg-slate-100 rounded-2xl text-slate-400 hover:bg-indigo-600 hover:text-white transition-all"><i className="fa-solid fa-comments"></i></button>
                                 </div>
@@ -172,48 +152,28 @@
             );
         };
 
-        // --- MAIN APPLICATION COMPONENT ---
         const App = () => {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [subTab, setSubTab] = useState(null);
             const [expanded, setExpanded] = useState(null); 
             const [viewMode, setViewMode] = useState('curriculum');
-            const [searchTerm, setSearchTerm] = useState("");
-            const [currentUser, setCurrentUser] = useState({
-                name: 'Humanities Educator',
-                subscriptions: [],
-                notifications: []
-            });
+            const [currentUser, setCurrentUser] = useState({ name: 'Staff Member', notifications: [] });
 
-            // Notification Trigger Logic
-            const addNotification = (notif) => {
-                const newNotif = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    timestamp: 'Just now',
-                    isRead: false,
-                    ...notif
-                };
-                setCurrentUser(prev => ({
-                    ...prev,
-                    notifications: [newNotif, ...prev.notifications]
-                }));
-            };
+            const addNotification = (notif) => setCurrentUser(prev => ({ ...prev, notifications: [notif, ...prev.notifications] }));
 
+            // --- NAVIGATION CONFIG (SUBJECTS ADDED HERE) ---
             const navConfig = [
                 { id: 'dashboard', label: 'Dashboard', icon: 'fa-gauge' },
                 { id: 'primary', label: 'Primary', icon: 'fa-child', subs: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6'] },
                 { id: 'lower-secondary', label: 'Lower Secondary', icon: 'fa-seedling', subs: ['Year 7', 'Year 8', 'Year 9'] },
-                { id: 'igcse', label: 'IGCSE', icon: 'fa-book-bookmark', subs: ['History', 'Geography', 'Economics', 'Business'] },
-                { id: 'ib', label: 'IB', icon: 'fa-graduation-cap', subs: ['History', 'Geography', 'Economics', 'Business'] }
+                { id: 'igcse', label: 'IGCSE', icon: 'fa-book-bookmark', subs: ['History', 'Geography', 'Economics', 'Business', 'Psychology', 'Sociology'] },
+                { id: 'ib', label: 'IB', icon: 'fa-graduation-cap', subs: ['History', 'Geography', 'Economics', 'Business', 'Psychology', 'Philosophy'] }
             ];
 
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden font-inter">
-                    {/* Sidebar */}
                     <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl overflow-y-auto custom-scrollbar">
-                        <div className="p-8 font-black text-sm uppercase text-indigo-400 tracking-tighter leading-none">
-                            YCYW Humanities <br/><span className="text-[10px] text-slate-500 font-bold">Portal v2.0</span>
-                        </div>
+                        <div className="p-8 font-black text-sm uppercase text-indigo-400">YCYW Humanities</div>
                         <nav className="flex-1 px-4 space-y-1">
                             {navConfig.map(item => (
                                 <div key={item.id}>
@@ -238,20 +198,8 @@
                     </div>
 
                     <div className="flex-1 flex flex-col overflow-hidden">
-                        {/* Header */}
-                        <header className="h-24 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm z-10">
-                            <div className="flex items-center gap-8 flex-1">
-                                <h2 className="font-black text-slate-800 uppercase text-lg tracking-tight leading-none min-w-[150px]">{subTab || activeTab}</h2>
-                                <div className="max-w-md w-full relative group">
-                                    <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors"></i>
-                                    <input 
-                                        placeholder="Search across all subject repositories..." 
-                                        className="w-full bg-slate-100 p-3 pl-12 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
+                        <header className="h-24 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm">
+                            <h2 className="font-black text-slate-800 uppercase text-lg tracking-tight">{subTab || activeTab}</h2>
                             <div className="flex items-center gap-6">
                                 {subTab && (
                                     <div className="bg-slate-100 p-1 rounded-2xl flex gap-1 shadow-inner">
@@ -260,90 +208,37 @@
                                         <button onClick={() => setViewMode('assessments')} className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'assessments' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Assessments</button>
                                     </div>
                                 )}
-                                <div className="flex items-center gap-3 px-4 py-3 bg-slate-100 rounded-xl shadow-sm cursor-pointer hover:bg-indigo-50 relative">
+                                <div className="flex items-center gap-3 px-4 py-3 bg-slate-100 rounded-xl shadow-sm relative">
                                     <i className="fa-solid fa-inbox text-slate-400"></i>
                                     <span className="text-[9px] font-black uppercase text-slate-400">Inbox</span>
-                                    {currentUser.notifications.length > 0 && (
-                                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full flex items-center justify-center text-[8px] text-white font-bold animate-pulse">
-                                            {currentUser.notifications.length}
-                                        </span>
-                                    )}
+                                    {currentUser.notifications.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></span>}
                                 </div>
-                                <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs uppercase shadow-lg shadow-indigo-100">
-                                    {currentUser.name[0]}
-                                </div>
+                                <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs">S</div>
                             </div>
                         </header>
-
-                        {/* Main Content */}
                         <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
                             {activeTab === 'dashboard' ? (
                                 <div className="space-y-8 animate-in">
                                     <div className="mesh-bg rounded-[4rem] p-16 text-white shadow-2xl relative overflow-hidden">
                                         <div className="mesh-circle"></div>
-                                        <h1 className="text-5xl font-black relative z-10 tracking-tighter leading-none">Welcome, {currentUser.name}</h1>
-                                        <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-[0.5em]">YCYW Humanities Network Hub</p>
+                                        <h1 className="text-5xl font-black relative z-10 tracking-tighter leading-none">Welcome to Humanities Portal</h1>
+                                        <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-[0.5em]">Network Excellence Hub</p>
                                     </div>
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                        <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm relative overflow-hidden">
-                                            <div className="absolute top-0 right-0 p-8 text-6xl text-indigo-50 opacity-50"><i className="fa-solid fa-newspaper"></i></div>
-                                            <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Subject Notifications</h3>
-                                            <div className="space-y-4">
-                                                {currentUser.notifications.length === 0 ? (
-                                                    <p className="text-xs font-bold text-slate-300 uppercase italic">No new updates in your subscribed areas.</p>
-                                                ) : (
-                                                    currentUser.notifications.map(n => (
-                                                        <div key={n.id} className="p-4 bg-slate-50 rounded-2xl border flex items-center gap-4">
-                                                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-black"><i className="fa-solid fa-bell"></i></div>
-                                                            <div>
-                                                                <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight">{n.title}</p>
-                                                                <p className="text-[11px] font-medium text-slate-500">{n.message}</p>
-                                                            </div>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </section>
-                                        <section className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl h-fit">
-                                            <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Network Calendar</h3>
-                                            <div className="space-y-4">
-                                                <div className="border-l-2 border-indigo-500 pl-4 py-1">
-                                                    <p className="text-[11px] font-black uppercase text-indigo-300">Jan 22, 2026</p>
-                                                    <p className="text-sm font-bold">IGCSE Geography Internal Moderation</p>
-                                                </div>
-                                                <div className="border-l-2 border-emerald-500 pl-4 py-1">
-                                                    <p className="text-[11px] font-black uppercase text-emerald-300">Feb 12, 2026</p>
-                                                    <p className="text-sm font-bold">Network Curriculum Day - Hong Kong</p>
-                                                </div>
-                                            </div>
-                                        </section>
+                                        <section className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm"><h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Subject Updates</h3><div className="text-sm font-semibold text-slate-500 italic">No network updates.</div></section>
+                                        <section className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl h-fit"><h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Upcoming PD</h3><div className="text-sm font-bold border-l-2 border-indigo-500 pl-4 py-1">Jan 22: Network Moderation</div></section>
                                     </div>
                                 </div>
                             ) : subTab ? (
                                 viewMode === 'curriculum' ? (
                                     <div className="space-y-8 animate-in">
-                                        <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm relative overflow-hidden">
-                                            <div className="absolute top-0 right-0 p-12 text-9xl text-indigo-50 opacity-50"><i className="fa-solid fa-graduation-cap"></i></div>
-                                            <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-8">Pedagogical Framework: {subTab}</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10">
-                                                <div className="space-y-6">
-                                                    <h4 className="text-2xl font-black text-slate-800 leading-tight">Learner Profile Goals</h4>
-                                                    <ul className="space-y-4">
-                                                        <li className="flex items-center gap-4 text-sm font-semibold text-slate-600">
-                                                            <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px]"><i className="fa-solid fa-check"></i></div>
-                                                            Critical Analysis of historical identity.
-                                                        </li>
-                                                        <li className="flex items-center gap-4 text-sm font-semibold text-slate-600">
-                                                            <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px]"><i className="fa-solid fa-check"></i></div>
-                                                            Spatial reasoning via active mapping.
-                                                        </li>
-                                                    </ul>
-                                                </div>
-                                                <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100">
-                                                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Inquiry Focus</h4>
-                                                    <p className="text-lg font-bold text-slate-800 leading-relaxed italic">"How does spatial logic inform our understanding of 21st-century global citizenship?"</p>
-                                                </div>
-                                            </div>
+                                        <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                                            <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-6">Network Goals: {subTab}</h3>
+                                            <ul className="list-disc pl-6 space-y-3 text-sm font-semibold text-slate-700">
+                                                <li>Analyze historical and societal foundations.</li>
+                                                <li>Evaluate geographical and spatial shifts.</li>
+                                                <li>Demonstrate civic responsibility in global contexts.</li>
+                                            </ul>
                                         </div>
                                     </div>
                                 ) : (
@@ -355,7 +250,9 @@
                                         addNotification={addNotification}
                                     />
                                 )
-                            ) : null}
+                            ) : (
+                                <div className="text-center py-40 text-slate-300 font-black uppercase text-[10px] tracking-[0.5em]">Select a subject to begin</div>
+                            )}
                         </main>
                     </div>
                 </div>
