@@ -25,7 +25,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyB5Vp_4Vf_ORr5vtDW9ml0VSzhoMt5dqc0",
@@ -37,109 +37,110 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        window.FB = { db: getFirestore(app), doc, onSnapshot, setDoc, collection };
+        window.FB = { db: getFirestore(app), doc, onSnapshot, setDoc };
     </script>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        const EXPLANATIONS = {
+        const PEDAGOGY_MAP = {
             "Analyze": "Break down in order to bring out the essential elements or structure.",
             "Evaluate": "Make an appraisal by weighing up the strengths and limitations.",
             "Explain": "Give a detailed account including reasons or causes.",
-            "Inquiry": "The process of asking questions and investigating evidence.",
-            "Map Reading": "The ability to interpret spatial data and symbols on a grid."
+            "Inquiry": "The process of investigating evidence and asking complex questions.",
+            "Map Reading": "Interpreting spatial symbols and data on various scales."
         };
 
         const PILLAR_DEFAULTS = [
-            { id: "pp", name: "Past & Present", icon: "fa-clock", color: "bg-amber-500", reqs: "Add requirements...", topics: "Add topics..." },
-            { id: "ew", name: "Our Evolving World", icon: "fa-earth-asia", color: "bg-emerald-500", reqs: "Add requirements...", topics: "Add topics..." },
-            { id: "gc", name: "Global Citizenship", icon: "fa-hands-holding-circle", color: "bg-indigo-500", reqs: "Add requirements...", topics: "Add topics..." },
-            { id: "eb", name: "Economics & Business", icon: "fa-chart-line", color: "bg-rose-500", reqs: "Add requirements...", topics: "Add topics..." }
+            { id: "pp", name: "Past & Present", icon: "fa-history", color: "bg-amber-500", reqs: "Focus on continuity and change.", topics: "Example: Industrial Revolution" },
+            { id: "ew", name: "Our Evolving World", icon: "fa-earth-asia", color: "bg-emerald-500", reqs: "Focus on human-environment interaction.", topics: "Example: Climate Change" },
+            { id: "gc", name: "Global Citizenship", icon: "fa-hands-holding-circle", color: "bg-indigo-500", reqs: "Focus on rights and responsibilities.", topics: "Example: SDGs" },
+            { id: "eb", name: "Economics & Business", icon: "fa-chart-line", color: "bg-rose-500", reqs: "Focus on resource management and logic.", topics: "Example: Global Trade" }
         ];
 
         const CurriculumView = ({ activeYear }) => {
-            const [localData, setLocalData] = useState(null);
+            const [data, setData] = useState(null);
             const [isEditing, setIsEditing] = useState(false);
             const [explanation, setExplanation] = useState(null);
             const [activePillarTab, setActivePillarTab] = useState('reqs');
 
-            // --- FIREBASE SYNC ---
             useEffect(() => {
                 const docRef = window.FB.doc(window.FB.db, "curriculum_metadata", activeYear.replace(/\s+/g, '_'));
                 const unsub = window.FB.onSnapshot(docRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        setLocalData(docSnap.data());
-                    } else {
-                        // Initialize default if empty
-                        setLocalData({
-                            goals: ["Goal 1...", "Goal 2..."],
-                            skills: ["Inquiry", "Map Reading"],
-                            commandTerms: ["Analyze", "Explain"],
-                            pillars: PILLAR_DEFAULTS
-                        });
-                    }
+                    if (docSnap.exists()) setData(docSnap.data());
+                    else setData({
+                        goals: ["Goal 1", "Goal 2"],
+                        skills: ["Inquiry", "Map Reading"],
+                        commandTerms: ["Analyze", "Explain"],
+                        pillars: PILLAR_DEFAULTS
+                    });
                 });
                 return () => unsub();
             }, [activeYear]);
 
             const handleSave = async () => {
                 const docRef = window.FB.doc(window.FB.db, "curriculum_metadata", activeYear.replace(/\s+/g, '_'));
-                await window.FB.setDoc(docRef, localData);
+                await window.FB.setDoc(docRef, data);
                 setIsEditing(false);
             };
 
             const updateField = (category, index, value, pillarId = null) => {
-                const newData = JSON.parse(JSON.stringify(localData));
+                const newData = JSON.parse(JSON.stringify(data));
                 if (pillarId) {
                     const pIdx = newData.pillars.findIndex(p => p.id === pillarId);
                     newData.pillars[pIdx][category] = value;
                 } else {
                     newData[category][index] = value;
                 }
-                setLocalData(newData);
+                setData(newData);
             };
 
-            if (!localData) return <div className="p-20 text-center font-black animate-pulse text-indigo-600">Syncing with YCYW Cloud...</div>;
+            if (!data) return <div className="p-20 text-center font-black animate-pulse text-indigo-600 uppercase tracking-widest">Loading YCYW Framework...</div>;
 
             return (
                 <div className="space-y-10 animate-in pb-20">
+                    {/* Pedagogy Popup */}
                     {explanation && (
                         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm" onClick={() => setExplanation(null)}>
                             <div className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full animate-in" onClick={e => e.stopPropagation()}>
                                 <h4 className="text-2xl font-black text-indigo-600 mb-4">{explanation.title}</h4>
-                                <p className="text-slate-600 font-medium leading-relaxed">{EXPLANATIONS[explanation.title] || "Pedagogical detail is currently being updated."}</p>
+                                <p className="text-slate-600 font-medium leading-relaxed">{PEDAGOGY_MAP[explanation.title] || "Information being updated by network leads."}</p>
                                 <button className="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs" onClick={() => setExplanation(null)}>Close</button>
                             </div>
                         </div>
                     )}
 
                     <div className="flex justify-between items-center">
-                        <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{activeYear} Curriculum</h2>
-                        <button onClick={isEditing ? handleSave : () => setIsEditing(true)} className={`px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest text-white shadow-xl transition-all ${isEditing ? 'bg-emerald-500 scale-110' : 'bg-indigo-600'}`}>
-                            {isEditing ? 'Confirm & Push Live' : 'Edit Framework'}
+                        <div>
+                            <span className="bg-indigo-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Global Framework</span>
+                            <h2 className="text-4xl font-black text-slate-900 tracking-tighter mt-1">{activeYear} Curriculum</h2>
+                        </div>
+                        <button onClick={isEditing ? handleSave : () => setIsEditing(true)} className={`px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest text-white shadow-xl transition-all ${isEditing ? 'bg-emerald-500 scale-105' : 'bg-indigo-600'}`}>
+                            {isEditing ? 'Push Changes Live' : 'Edit Framework'}
                         </button>
                     </div>
 
-                    <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
+                    {/* Achievement Goals */}
+                    <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm relative overflow-hidden">
                         <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-8">Achievement Goals</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {localData.goals.map((g, i) => (
+                            {data.goals.map((g, i) => (
                                 <div key={i} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-transparent hover:border-indigo-100 transition-all">
                                     <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></div>
-                                    {isEditing ? <input className="w-full bg-transparent font-bold outline-none" value={g} onChange={e => updateField('goals', i, e.target.value)} /> : <p className="font-bold text-slate-700">{g}</p>}
+                                    {isEditing ? <input className="w-full bg-transparent font-bold outline-none border-b border-indigo-200" value={g} onChange={e => updateField('goals', i, e.target.value)} /> : <p className="font-bold text-slate-700">{g}</p>}
                                 </div>
                             ))}
                         </div>
                     </div>
 
+                    {/* Skills & Terms */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-2xl">
                             <h3 className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-6">Skills Focus</h3>
                             <div className="flex flex-wrap gap-3">
-                                {localData.skills.map((s, i) => (
+                                {data.skills.map((s, i) => (
                                     <div key={i} className="flex gap-2 bg-white/10 p-1 pr-4 rounded-2xl border border-white/5 items-center">
-                                        {isEditing ? <input className="bg-transparent text-sm font-bold w-24 outline-none ml-2" value={s} onChange={e => updateField('skills', i, e.target.value)} /> : 
+                                        {isEditing ? <input className="bg-transparent text-sm font-bold w-24 outline-none ml-2 border-b border-white/20" value={s} onChange={e => updateField('skills', i, e.target.value)} /> : 
                                         <button onClick={() => setExplanation({title: s})} className="text-sm font-bold ml-3 hover:text-indigo-300 transition-colors uppercase tracking-widest">{s}</button>}
                                     </div>
                                 ))}
@@ -148,9 +149,9 @@
                         <div className="bg-indigo-600 p-8 rounded-[3rem] text-white shadow-2xl">
                             <h3 className="text-[10px] font-black text-indigo-100 uppercase tracking-widest mb-6">Command Terms</h3>
                             <div className="flex flex-wrap gap-3">
-                                {localData.commandTerms.map((t, i) => (
+                                {data.commandTerms.map((t, i) => (
                                     <div key={i} className="flex gap-2 bg-white/20 p-1 pr-4 rounded-2xl border border-white/10 items-center">
-                                        {isEditing ? <input className="bg-transparent text-sm font-bold w-24 outline-none ml-2" value={t} onChange={e => updateField('commandTerms', i, e.target.value)} /> : 
+                                        {isEditing ? <input className="bg-transparent text-sm font-bold w-24 outline-none ml-2 border-b border-white/20" value={t} onChange={e => updateField('commandTerms', i, e.target.value)} /> : 
                                         <button onClick={() => setExplanation({title: t})} className="text-sm font-black ml-3 hover:text-indigo-200 transition-colors uppercase tracking-widest">{t}</button>}
                                     </div>
                                 ))}
@@ -158,10 +159,11 @@
                         </div>
                     </div>
 
+                    {/* Focus Pillars (The 4 Requested Sections) */}
                     <div className="space-y-6">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] text-center">Network Focus Areas</h3>
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] text-center">Focus Pillars</h3>
                         <div className="grid grid-cols-1 gap-6">
-                            {localData.pillars.map(p => (
+                            {data.pillars.map(p => (
                                 <div key={p.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col lg:flex-row gap-8 hover:shadow-md transition-shadow">
                                     <div className="w-full lg:w-1/4 flex flex-col items-center justify-center text-center border-b lg:border-b-0 lg:border-r border-slate-50 pb-6 lg:pb-0 lg:pr-8">
                                         <div className={`${p.color} w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-white text-2xl shadow-lg mb-4`}><i className={`fa-solid ${p.icon}`}></i></div>
@@ -172,14 +174,14 @@
                                             <button onClick={() => setActivePillarTab('reqs')} className={`text-[10px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${activePillarTab === 'reqs' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-300'}`}>Requirements</button>
                                             <button onClick={() => setActivePillarTab('topics')} className={`text-[10px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${activePillarTab === 'topics' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-300'}`}>Example Topics</button>
                                         </div>
-                                        <div className="p-6 bg-slate-50 rounded-3xl min-h-[120px] flex items-center shadow-inner">
+                                        <div className="p-6 bg-slate-50 rounded-3xl min-h-[120px] flex items-center shadow-inner relative">
                                             {isEditing ? (
                                                 <textarea 
-                                                    className="w-full bg-transparent font-medium text-slate-600 outline-none h-full border-none focus:ring-0 resize-none" 
+                                                    className="w-full bg-transparent font-medium text-slate-600 outline-none h-full border-none focus:ring-0 resize-none text-sm" 
                                                     value={activePillarTab === 'reqs' ? p.reqs : p.topics} 
                                                     onChange={e => updateField(activePillarTab === 'reqs' ? 'reqs' : 'topics', null, e.target.value, p.id)}
                                                 />
-                                            ) : <p className="text-slate-600 font-medium leading-relaxed italic">{activePillarTab === 'reqs' ? p.reqs : p.topics}</p>}
+                                            ) : <p className="text-slate-600 font-medium leading-relaxed italic text-sm">{activePillarTab === 'reqs' ? p.reqs : p.topics}</p>}
                                         </div>
                                     </div>
                                 </div>
@@ -205,15 +207,16 @@
 
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden font-inter text-slate-900">
+                    {/* Sidebar */}
                     <div className="w-64 bg-[#0f172a] text-white flex flex-col h-screen shrink-0 shadow-2xl overflow-y-auto custom-scrollbar">
                         <div className="p-8 font-black text-sm uppercase text-indigo-400 tracking-tighter leading-none">
-                            YCYW Humanities <br/><span className="text-[8px] opacity-40">Live Framework Sync</span>
+                            YCYW Humanities <br/><span className="text-[8px] opacity-40">Framework 2.0</span>
                         </div>
                         <nav className="flex-1 px-4 space-y-1">
                             {navConfig.map(item => (
                                 <div key={item.id}>
                                     <button onClick={() => item.subs ? setExpandedNav(expandedNav === item.id ? null : item.id) : (setActiveTab(item.id), setSubTab(null))}
-                                        className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === item.id && !subTab ? 'bg-indigo-600 shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                        className={`w-full flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === item.id && !subTab ? 'bg-indigo-600 shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:bg-slate-800'}`}>
                                         <div className="flex items-center gap-3"><i className={`fa-solid ${item.icon} w-4 text-center`}></i>{item.label}</div>
                                         {item.subs && <i className={`fa-solid fa-chevron-down opacity-30 ${expandedNav === item.id ? 'rotate-180' : ''}`}></i>}
                                     </button>
@@ -232,23 +235,23 @@
                         </nav>
                     </div>
 
-                    <div className="flex-1 flex flex-col min-w-0">
+                    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                         <header className="h-24 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm z-10">
-                            <h2 className="font-black text-slate-800 uppercase text-lg leading-none tracking-tighter">{subTab || activeTab}</h2>
+                            <h2 className="font-black text-slate-800 uppercase text-lg tracking-tighter">{subTab || activeTab}</h2>
                             <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xs shadow-lg uppercase">S</div>
                         </header>
 
                         <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
                             {activeTab === 'dashboard' ? (
-                                <div className="space-y-8">
+                                <div className="space-y-8 animate-in">
                                     <div className="p-16 mesh-bg rounded-[4rem] text-white shadow-2xl relative overflow-hidden text-center">
                                         <div className="mesh-circle"></div>
-                                        <h1 className="text-5xl font-black relative z-10 tracking-tighter">Live Network Hub</h1>
-                                        <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-widest">Shared Curriculum standards</p>
+                                        <h1 className="text-5xl font-black relative z-10 tracking-tighter">Live Framework Sync</h1>
+                                        <p className="mt-4 text-indigo-100 relative z-10 font-bold uppercase text-xs tracking-widest">Real-time Curriculum Management</p>
                                     </div>
-                                    <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
-                                        <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Sync Status</h3>
-                                        <p className="text-xs font-bold text-slate-400 uppercase">Connected to Firebase Realtime Database: <span className="text-emerald-500 ml-2">Healthy</span></p>
+                                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+                                        <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2">Cloud Connection</h3>
+                                        <p className="text-xs text-slate-400 font-bold uppercase">Database Status: <span className="text-emerald-500 ml-2">Authenticated & Ready</span></p>
                                     </div>
                                 </div>
                             ) : subTab ? (
